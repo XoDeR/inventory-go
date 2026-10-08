@@ -1,0 +1,103 @@
+version: "2"
+
+run:
+  timeout: 5m
+  relative-path-mode: gomod
+  issues-exit-code: 1
+  tests: true
+  modules-download-mode: readonly
+
+output:
+  formats:
+    text:
+      print-linter-name: true
+      print-issued-lines: true
+      colors: true
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: true
+
+linters:
+  default: standard
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - gocritic
+    - revive
+    - unused
+    - gosec
+    - depguard
+    - bodyclose
+    - asciicheck
+    - cyclop
+    - dupl
+    - ineffassign
+    - unparam
+    - errorlint
+    - errname
+    - forbidigo
+    - contextcheck
+    - containedctx
+  disable:
+    - gocyclo
+    - lll
+
+  exclusions:
+    generated: strict
+    rules:
+      - path: _test\.go
+        linters:
+          - cyclop
+          - dupl
+          - gosec
+
+  settings:
+
+    gosec:
+      config:
+        global:
+          audit: true
+          show-ignored: true
+        severity: "medium"
+        confidence: "medium"
+
+    cyclop:
+      max-complexity: 20
+
+    depguard:
+      rules:
+        main:
+          deny:
+            - pkg: io/ioutil
+              desc: "io/ioutil is deprecated"
+
+    revive:
+      severity: warning
+
+    forbidigo:
+      exclude-godoc-examples: true
+      analyze-types: true
+      forbid:
+        - pattern: '^fmt\.Print.*$'  # fmt.Print*, fmt.Println, etc are forbidded
+          msg: "Can't use fmt.Print* for logging -- use structural logging instead"
+        - pattern: '^time\.Sleep$'  # time.Sleep is forbidden
+          msg: "Can't use time.Sleep in prod code, use timer/context instead"
+        - pattern: '^http\.DefaultClient$'  # http.DefaultClient is forbidden
+          msg: "Can't use http.DefaultClient (no timeout) -- create *http.Client with timeouts"
+
+formatters:
+  enable:
+    - gofumpt
+    - gci
+  settings:
+    gofumpt:
+      extra-rules: true
+    gci:
+      sections:
+        - Standard
+        - Default
+        - Prefix(inventory-go/)
+      no-inline-comments: false
