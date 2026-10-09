@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"inventory-go/pkg/models"
 	"log"
 	"net"
 	"net/http"
@@ -18,6 +17,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/render"
 	"github.com/google/uuid"
+
+	"inventory-go/pkg/models"
 )
 
 const (
@@ -83,7 +84,6 @@ func main() {
 
 func createOrderHandler(storage *models.OrderStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-
 		var order models.Order
 		if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest) // 400

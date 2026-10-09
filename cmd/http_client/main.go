@@ -5,13 +5,14 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"inventory-go/pkg/models"
 	"io"
 	"log"
 	"net/http"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
+
+	"inventory-go/pkg/models"
 )
 
 const (
