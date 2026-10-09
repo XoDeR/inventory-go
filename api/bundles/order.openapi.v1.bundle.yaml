@@ -1,0 +1,292 @@
+openapi: 3.0.3
+info:
+  title: OrderService API
+  version: 1.0.0
+  description: API to process orders
+tags:
+  - name: Order
+    description: Operations to process orders
+paths:
+  /api/v1/orders:
+    post:
+      summary: Create an order
+      description: |
+        Creates a new order based on the parts selected by the user.
+
+        - Fetches parts via `InventoryService.ListParts`.
+        - Verifies that all parts exist. If at least one is missing, returns an error.
+        - Calculates `total_price` and generates `order_uuid`.
+        - Saves the order with status `PENDING_PAYMENT`.
+      operationId: CreateOrder
+      tags:
+        - Order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/create_order_request'
+      responses:
+        '201':
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/create_order_response'
+        '400':
+          $ref: '#/components/responses/bad_request'
+        '404':
+          $ref: '#/components/responses/not_found'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+        default:
+          $ref: '#/components/responses/unexpected_error'
+  /api/v1/orders/{order_uuid}:
+    get:
+      summary: Get an order by UUID
+      description: Looks up the order by UUID and returns it, or 404 Not Found.
+      operationId: GetOrderByUuid
+      tags:
+        - Order
+      parameters:
+        - $ref: '#/components/parameters/order_uuid'
+      responses:
+        '200':
+          description: Order found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/order'
+        '404':
+          $ref: '#/components/responses/not_found'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+        default:
+          $ref: '#/components/responses/unexpected_error'
+  /api/v1/orders/{order_uuid}/pay:
+    post:
+      summary: Pay for an order
+      description: |
+        Processes payment for a previously created order.
+
+        - Finds the order by `order_uuid`. If it does not exist, returns 404 Not Found.
+        - Calls `PaymentService.PayOrder` with `user_uuid`, `order_uuid` and `payment_method`
+          and receives `transaction_uuid`.
+        - Updates the order: status -> `PAID`, stores `transaction_uuid` and `payment_method`.
+      operationId: PayOrder
+      tags:
+        - Order
+      parameters:
+        - $ref: '#/components/parameters/order_uuid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/pay_order_request'
+      responses:
+        '200':
+          description: Order paid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/pay_order_response'
+        '400':
+          $ref: '#/components/responses/bad_request'
+        '404':
+          $ref: '#/components/responses/not_found'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+        default:
+          $ref: '#/components/responses/unexpected_error'
+  /api/v1/orders/{order_uuid}/cancel:
+    post:
+      summary: Cancel an order
+      description: |
+        Cancels an order.
+
+        - If the status is `PENDING_PAYMENT`, changes it to `CANCELLED`.
+        - If the status is `PAID`, returns 409 Conflict.
+      operationId: CancelOrder
+      tags:
+        - Order
+      parameters:
+        - $ref: '#/components/parameters/order_uuid'
+      responses:
+        '204':
+          description: Order cancelled successfully
+        '404':
+          $ref: '#/components/responses/not_found'
+        '409':
+          $ref: '#/components/responses/conflict'
+        '500':
+          $ref: '#/components/responses/internal_server_error'
+        default:
+          $ref: '#/components/responses/unexpected_error'
+components:
+  schemas:
+    create_order_request:
+      type: object
+      required:
+        - user_uuid
+        - part_uuids
+      properties:
+        user_uuid:
+          type: string
+          format: uuid
+          description: User UUID
+        part_uuids:
+          type: array
+          description: List of part UUIDs
+          minItems: 1
+          items:
+            type: string
+            format: uuid
+    error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: integer
+          format: int32
+          description: HTTP status code
+        message:
+          type: string
+          description: Error description
+    create_order_response:
+      type: object
+      required:
+        - order_uuid
+        - total_price
+      properties:
+        order_uuid:
+          type: string
+          format: uuid
+          description: Unique order identifier
+        total_price:
+          type: number
+          format: double
+          description: Total price
+          example: 123.45
+    payment_method:
+      type: string
+      description: Payment method
+      enum:
+        - UNKNOWN
+        - CARD
+        - CREDIT_CARD
+        - STORE_CREDIT
+      x-enum-descriptions:
+        - Unknown method
+        - Bank card
+        - Credit card
+        - Store balance (bonuses)
+    order_status:
+      type: string
+      description: Order status
+      enum:
+        - PENDING_PAYMENT
+        - PAID
+        - CANCELLED
+    order:
+      type: object
+      required:
+        - order_uuid
+        - user_uuid
+        - part_uuids
+        - total_price
+        - status
+      properties:
+        order_uuid:
+          type: string
+          format: uuid
+          description: Unique order identifier
+        user_uuid:
+          type: string
+          format: uuid
+          description: User UUID
+        part_uuids:
+          type: array
+          description: List of part UUIDs
+          items:
+            type: string
+            format: uuid
+        total_price:
+          type: number
+          format: double
+          description: Total price
+          example: 123.45
+        transaction_uuid:
+          type: string
+          format: uuid
+          nullable: true
+          description: Transaction UUID (if paid)
+        payment_method:
+          allOf:
+            - $ref: '#/components/schemas/payment_method'
+          nullable: true
+          description: Payment method (if paid)
+        status:
+          $ref: '#/components/schemas/order_status'
+    pay_order_request:
+      type: object
+      required:
+        - payment_method
+      properties:
+        payment_method:
+          $ref: '#/components/schemas/payment_method'
+    pay_order_response:
+      type: object
+      required:
+        - transaction_uuid
+      properties:
+        transaction_uuid:
+          type: string
+          format: uuid
+          description: Transaction UUID
+  responses:
+    unexpected_error:
+      description: Unexpected error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    bad_request:
+      description: Bad request (e.g. some of the parts do not exist)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    not_found:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    internal_server_error:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+    conflict:
+      description: Conflict (order is already paid and cannot be cancelled)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/error'
+  parameters:
+    order_uuid:
+      name: order_uuid
+      in: path
+      required: true
+      description: Unique order identifier
+      schema:
+        type: string
+        format: uuid
+x-ogen:
+  target: ./pkg/openapi/order/v1
+  package: order_v1
+  clean: true
