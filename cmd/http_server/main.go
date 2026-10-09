@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 	"github.com/google/uuid"
 
 	"inventory-go/pkg/models"
+
+	orderV1 "inventory-go/pkg/openapi/order/v1"
 )
 
 const (
@@ -28,6 +31,42 @@ const (
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 10 * time.Second
 )
+
+type OrderStorage struct {
+	mu     sync.RWMutex
+	orders map[string]*orderV1.Order
+}
+
+func NewOrderStorage() *OrderStorage {
+	return &OrderStorage{
+		orders: make(map[string]*orderV1.Order),
+	}
+}
+
+func (s *OrderStorage) CreateOrder(order orderV1.Order) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.orders[order.Uuid] = &order
+}
+
+func (s *OrderStorage) UpdateOrder(order orderV1.Order) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.orders[order.OrderUUID.String()] = &order
+}
+
+func (s *OrderStorage) GetOrder(uuid string) *orderV1.Order {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	order, ok := s.orders[uuid]
+	if !ok {
+		return nil
+	}
+	return order
+}
 
 func main() {
 	storage := models.NewOrderStorage()
