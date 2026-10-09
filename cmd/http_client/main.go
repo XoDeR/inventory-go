@@ -8,11 +8,10 @@ import (
 	"inventory-go/pkg/models"
 	"io"
 	"log"
-	"math/rand/v2"
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/brianvoe/gofakeit/v7"
 )
 
 const (
@@ -136,22 +135,22 @@ func getOrder(ctx context.Context, uuid string) (*models.Order, error) {
 // generateRandomOrder builds an order with random user, parts, price,
 // status and payment data. Uuid and timestamps are assigned by the server.
 func generateRandomOrder() *models.Order {
-	partUuids := make([]string, 1+rand.IntN(5))
+	partUuids := make([]string, gofakeit.IntRange(1, 5))
 	for i := range partUuids {
-		partUuids[i] = uuid.NewString()
+		partUuids[i] = gofakeit.UUID()
 	}
 
 	order := &models.Order{
-		UserUuid:   uuid.NewString(),
+		UserUuid:   gofakeit.UUID(),
 		PartUuids:  partUuids,
-		TotalPrice: 100 + rand.IntN(100_000),
-		Status:     orderStatuses[rand.IntN(len(orderStatuses))],
+		TotalPrice: gofakeit.IntRange(100, 100_100),
+		Status:     gofakeit.RandomString(orderStatuses),
 	}
 
 	// half of the orders are already paid
-	if rand.IntN(2) == 0 {
-		transactionUuid := uuid.NewString()
-		paymentMethod := paymentMethods[rand.IntN(len(paymentMethods))]
+	if gofakeit.Bool() {
+		transactionUuid := gofakeit.UUID()
+		paymentMethod := gofakeit.RandomString(paymentMethods)
 		order.TransactionUuid = &transactionUuid
 		order.PaymentMethod = &paymentMethod
 	}
