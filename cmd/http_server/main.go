@@ -2,9 +2,7 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -16,10 +14,6 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"github.com/go-chi/render"
-	"github.com/google/uuid"
-
-	"inventory-go/pkg/models"
 
 	orderV1 "inventory-go/pkg/openapi/order/v1"
 )
@@ -47,7 +41,7 @@ func (s *OrderStorage) CreateOrder(order orderV1.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.orders[order.Uuid] = &order
+	s.orders[order.OrderUUID.String()] = &order
 }
 
 func (s *OrderStorage) UpdateOrder(order orderV1.Order) {
@@ -68,8 +62,51 @@ func (s *OrderStorage) GetOrder(uuid string) *orderV1.Order {
 	return order
 }
 
+// Implements orderV1.Handler interface
+type OrderHandler struct {
+	storage *OrderStorage
+}
+
+func NewOrderHandler(storage *OrderStorage) *OrderHandler {
+	return &OrderHandler{
+		storage: storage,
+	}
+}
+
+// POST /api/v1/orders/{order_uuid}/cancel
+func CancelOrder(ctx context.Context, params orderV1.CancelOrderParams) (orderV1.CancelOrderRes, error) {
+
+}
+
+// POST /api/v1/orders
+func CreateOrder(ctx context.Context, req *orderV1.CreateOrderRequest) (orderV1.CreateOrderRes, error) {
+
+}
+
+// GET /api/v1/orders/{order_uuid}
+func GetOrderByUuid(ctx context.Context, params orderV1.GetOrderByUuidParams) (orderV1.GetOrderByUuidRes, error) {
+
+}
+
+// POST /api/v1/orders/{order_uuid}/pay
+func PayOrder(ctx context.Context, req *orderV1.PayOrderRequest, params orderV1.PayOrderParams) (orderV1.PayOrderRes, error) {
+
+}
+
+// Used for common default response.
+func NewError(ctx context.Context, err error) *orderV1.UnexpectedErrorStatusCode {
+
+}
+
 func main() {
-	storage := models.NewOrderStorage()
+	storage := NewOrderStorage()
+
+	orderHandler := NewOrderHandler(storage)
+
+	orderServer, err := orderV1.NewServer(orderHandler)
+	if err != nil {
+		log.Fatalf("error creating OpenApi server: %v", err)
+	}
 
 	// router
 	r := chi.NewRouter()
@@ -78,14 +115,8 @@ func main() {
 	r.Use(middleware.Logger) // log like: PUT http://localhost:8080/api/v1/order/3c516345-47df-4eba-a9d6-da1e3d80860b HTTP/1.1" from 127.0.0.
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
-	r.Use(render.SetContentType(render.ContentTypeJSON))
 
-	// routes
-	r.Route("/api/v1/order", func(r chi.Router) {
-		r.Post("/", createOrderHandler(storage))
-		r.Get("/{uuid}", getOrderHandler(storage))
-		r.Put("/{uuid}", updateOrderHandler(storage))
-	})
+	r.Mount("/", orderServer)
 
 	// create server
 	server := &http.Server{
@@ -113,72 +144,10 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
-	err := server.Shutdown(ctx)
+	err = server.Shutdown(ctx)
 	if err != nil {
 		log.Printf("Server shutdown error: %v\n", err)
 	}
 
 	log.Println("Server stopped.")
-}
-
-func createOrderHandler(storage *models.OrderStorage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var order models.Order
-		if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest) // 400
-			return
-		}
-
-		now := time.Now()
-		order.Uuid = uuid.NewString()
-		order.CreatedAt = now
-		order.UpdatedAt = now
-
-		storage.CreateOrder(order)
-
-		render.Status(r, http.StatusCreated) // 201
-		render.JSON(w, r, order)
-	}
-}
-
-func updateOrderHandler(storage *models.OrderStorage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uuid := chi.URLParam(r, urlParamUuid)
-		if uuid == "" {
-			http.Error(w, "Uuid parameter is required", http.StatusBadRequest) // 400
-			return
-		}
-
-		var orderUpdate models.Order
-		if err := json.NewDecoder(r.Body).Decode(&orderUpdate); err != nil {
-			http.Error(w, "Invalid request body", http.StatusBadRequest) // 400
-			return
-		}
-
-		orderUpdate.Uuid = uuid
-
-		orderUpdate.UpdatedAt = time.Now()
-
-		storage.UpdateOrder(orderUpdate)
-
-		render.JSON(w, r, orderUpdate)
-	}
-}
-
-func getOrderHandler(storage *models.OrderStorage) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		uuid := chi.URLParam(r, urlParamUuid)
-		if uuid == "" {
-			http.Error(w, "Uuid parameter is required", http.StatusBadRequest) // 400
-			return
-		}
-
-		order := storage.GetOrder(uuid)
-		if order == nil {
-			http.Error(w, fmt.Sprintf("Order for uuid '%s' not found", uuid), http.StatusNotFound) // 404
-			return
-		}
-
-		render.JSON(w, r, order)
-	}
 }
