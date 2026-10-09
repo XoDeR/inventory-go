@@ -41,7 +41,7 @@ func main() {
 	r.Use(render.SetContentType(render.ContentTypeJSON))
 
 	// routes
-	r.Route("/api/order", func(r chi.Router) {
+	r.Route("/api/v1/order", func(r chi.Router) {
 		r.Post("/", createOrderHandler(storage))
 		r.Get("/{uuid}", getOrderHandler(storage))
 		r.Put("/{uuid}", updateOrderHandler(storage))
@@ -83,6 +83,7 @@ func main() {
 
 func createOrderHandler(storage *models.OrderStorage) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+
 		var order models.Order
 		if err := json.NewDecoder(r.Body).Decode(&order); err != nil {
 			http.Error(w, "Invalid request body", http.StatusBadRequest) // 400
