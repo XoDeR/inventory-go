@@ -19,16 +19,16 @@ vars:
   GOFUMPT: '{{.BIN_DIR}}/gofumpt{{exeExt}}'
   GCI: '{{.BIN_DIR}}/gci{{exeExt}}'
   GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint{{exeExt}}'
-  OGEN: '{{.BIN_DIR}}/ogen'
-  YQ: '{{.BIN_DIR}}/yq'
+  OGEN: '{{.BIN_DIR}}/ogen{{exeExt}}'
+  YQ: '{{.BIN_DIR}}/yq{{exeExt}}'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
-  REDOCLY: '{{.NODE_MODULES_DIR}}/redocly'
+  REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
 
-  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/shared/api/order/v1/order.openapi.yaml'
-  OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/shared/api/bundles/order.openapi.v1.bundle.yaml'
+  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/api/order/v1/order.openapi.yaml'
+  OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/api/bundles/order.openapi.v1.bundle.yaml'
 
-  OPEN_API_FILES: '{{.ROOT_DIR}}/shared/api/bundles'
+  OPEN_API_FILES: '{{.ROOT_DIR}}/api/bundles'
 
 tasks:
   install-formatters:
@@ -163,7 +163,7 @@ tasks:
     cmds:
       - task: redocly-cli:bundle
       - |
-        find {{.OPEN_API_FILES}} -name '*.yaml' -o -name '*.yml' | while read -r file; do
+        for file in {{.OPEN_API_FILES}}/*.yaml {{.OPEN_API_FILES}}/*.yml; do
           if [ -f "$file" ] && grep -q 'x-ogen:' "$file"; then
             echo "🚀 Generating from: $file"
             target=$({{.YQ}} e '."x-ogen".target' "$file")
