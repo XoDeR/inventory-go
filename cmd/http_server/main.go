@@ -12,8 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/google/uuid"
 
 	orderV1 "inventory-go/pkg/openapi/order/v1"
 )
@@ -74,28 +76,108 @@ func NewOrderHandler(storage *OrderStorage) *OrderHandler {
 }
 
 // POST /api/v1/orders/{order_uuid}/cancel
-func CancelOrder(ctx context.Context, params orderV1.CancelOrderParams) (orderV1.CancelOrderRes, error) {
+func (h *OrderHandler) CancelOrder(_ context.Context, params orderV1.CancelOrderParams) (orderV1.CancelOrderRes, error) {
+	order := h.storage.GetOrder(params.OrderUUID.String())
+	if order == nil {
+		return &orderV1.CancelOrderNotFound{
+			Code:    http.StatusNotFound,
+			Message: "order not found",
+		}, nil
+	}
 
+	if order.Status == orderV1.OrderStatusPAID {
+		return &orderV1.CancelOrderConflict{
+			Code:    http.StatusConflict,
+			Message: "order is already paid and cannot be cancelled",
+		}, nil
+	}
+
+	// copy to avoid mutating the stored order outside of the storage lock
+	updated := *order
+	updated.Status = orderV1.OrderStatusCANCELLED
+	h.storage.UpdateOrder(updated)
+
+	return &orderV1.CancelOrderNoContent{}, nil
 }
 
 // POST /api/v1/orders
-func CreateOrder(ctx context.Context, req *orderV1.CreateOrderRequest) (orderV1.CreateOrderRes, error) {
+func (h *OrderHandler) CreateOrder(_ context.Context, req *orderV1.CreateOrderRequest) (orderV1.CreateOrderRes, error) {
+	if len(req.PartUuids) == 0 {
+		return &orderV1.CreateOrderBadRequest{
+			Code:    http.StatusBadRequest,
+			Message: "part_uuids must not be empty",
+		}, nil
+	}
 
+	// TODO: fetch parts via InventoryService.ListParts, return an error if any is missing
+	// and sum their real prices. Until the inventory client exists, prices are generated.
+	var totalPrice float64
+	for range req.PartUuids {
+		totalPrice += gofakeit.Price(100, 1000)
+	}
+
+	order := orderV1.Order{
+		OrderUUID:  uuid.New(),
+		UserUUID:   req.UserUUID,
+		PartUuids:  req.PartUuids,
+		TotalPrice: totalPrice,
+		Status:     orderV1.OrderStatusPENDINGPAYMENT,
+	}
+	h.storage.CreateOrder(order)
+
+	return &orderV1.CreateOrderResponse{
+		OrderUUID:  order.OrderUUID,
+		TotalPrice: order.TotalPrice,
+	}, nil
 }
 
 // GET /api/v1/orders/{order_uuid}
-func GetOrderByUuid(ctx context.Context, params orderV1.GetOrderByUuidParams) (orderV1.GetOrderByUuidRes, error) {
+func (h *OrderHandler) GetOrderByUuid(_ context.Context, params orderV1.GetOrderByUuidParams) (orderV1.GetOrderByUuidRes, error) {
+	order := h.storage.GetOrder(params.OrderUUID.String())
+	if order == nil {
+		return &orderV1.GetOrderByUuidNotFound{
+			Code:    http.StatusNotFound,
+			Message: "order not found",
+		}, nil
+	}
 
+	return order, nil
 }
 
 // POST /api/v1/orders/{order_uuid}/pay
-func PayOrder(ctx context.Context, req *orderV1.PayOrderRequest, params orderV1.PayOrderParams) (orderV1.PayOrderRes, error) {
+func (h *OrderHandler) PayOrder(_ context.Context, req *orderV1.PayOrderRequest, params orderV1.PayOrderParams) (orderV1.PayOrderRes, error) {
+	order := h.storage.GetOrder(params.OrderUUID.String())
+	if order == nil {
+		return &orderV1.PayOrderNotFound{
+			Code:    http.StatusNotFound,
+			Message: "order not found",
+		}, nil
+	}
 
+	// TODO: call PaymentService.PayOrder with user_uuid, order_uuid and payment_method.
+	// Until the payment client exists, the transaction uuid is generated locally.
+	transactionUUID := uuid.New()
+
+	updated := *order
+	updated.Status = orderV1.OrderStatusPAID
+	updated.TransactionUUID = orderV1.NewOptNilUUID(transactionUUID)
+	updated.PaymentMethod = orderV1.NewOptNilPaymentMethod(req.PaymentMethod)
+	h.storage.UpdateOrder(updated)
+
+	return &orderV1.PayOrderResponse{
+		TransactionUUID: transactionUUID,
+	}, nil
 }
 
 // Used for common default response.
-func NewError(ctx context.Context, err error) *orderV1.UnexpectedErrorStatusCode {
-
+func (h *OrderHandler) NewError(_ context.Context, err error) *orderV1.UnexpectedErrorStatusCode {
+	return &orderV1.UnexpectedErrorStatusCode{
+		StatusCode: http.StatusInternalServerError,
+		Response: orderV1.Error{
+			Code:    http.StatusInternalServerError,
+			Message: err.Error(),
+		},
+	}
 }
 
 func main() {
