@@ -35,7 +35,7 @@ func main() {
 	r := chi.NewRouter()
 
 	// middleware
-	r.Use(middleware.Logger)
+	r.Use(middleware.Logger) // log like: PUT http://localhost:8080/api/v1/order/3c516345-47df-4eba-a9d6-da1e3d80860b HTTP/1.1" from 127.0.0.
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(10 * time.Second))
 	r.Use(render.SetContentType(render.ContentTypeJSON))
