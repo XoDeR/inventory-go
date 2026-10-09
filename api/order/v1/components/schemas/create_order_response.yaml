@@ -1,0 +1,14 @@
+type: object
+required:
+  - order_uuid
+  - total_price
+properties:
+  order_uuid:
+    type: string
+    format: uuid
+    description: Unique order identifier
+  total_price:
+    type: number
+    format: double
+    description: Total price
+    example: 123.45

@@ -1,0 +1,5 @@
+description: Bad request (e.g. some of the parts do not exist)
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/error.yaml

@@ -1,0 +1,33 @@
+post:
+  summary: Create an order
+  description: |
+    Creates a new order based on the parts selected by the user.
+
+    - Fetches parts via `InventoryService.ListParts`.
+    - Verifies that all parts exist. If at least one is missing, returns an error.
+    - Calculates `total_price` and generates `order_uuid`.
+    - Saves the order with status `PENDING_PAYMENT`.
+  operationId: CreateOrder
+  tags:
+    - Order
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/create_order_request.yaml
+  responses:
+    '201':
+      description: Order created
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/create_order_response.yaml
+    '400':
+      $ref: ../components/errors/bad_request.yaml
+    '404':
+      $ref: ../components/errors/not_found.yaml
+    '500':
+      $ref: ../components/errors/internal_server_error.yaml
+    default:
+      $ref: ../components/errors/unexpected_error.yaml

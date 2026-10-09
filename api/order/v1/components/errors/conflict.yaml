@@ -1,0 +1,5 @@
+description: Conflict (order is already paid and cannot be cancelled)
+content:
+  application/json:
+    schema:
+      $ref: ../schemas/error.yaml

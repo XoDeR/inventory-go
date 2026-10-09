@@ -1,0 +1,39 @@
+type: object
+required:
+  - order_uuid
+  - user_uuid
+  - part_uuids
+  - total_price
+  - status
+properties:
+  order_uuid:
+    type: string
+    format: uuid
+    description: Unique order identifier
+  user_uuid:
+    type: string
+    format: uuid
+    description: User UUID
+  part_uuids:
+    type: array
+    description: List of part UUIDs
+    items:
+      type: string
+      format: uuid
+  total_price:
+    type: number
+    format: double
+    description: Total price
+    example: 123.45
+  transaction_uuid:
+    type: string
+    format: uuid
+    nullable: true
+    description: Transaction UUID (if paid)
+  payment_method:
+    allOf:
+      - $ref: ./payment_method.yaml
+    nullable: true
+    description: Payment method (if paid)
+  status:
+    $ref: ./order_status.yaml

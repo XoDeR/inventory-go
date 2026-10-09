@@ -1,0 +1,133 @@
+#### `POST /api/v1/orders` — create an order
+
+Creates a new order based on the parts selected by the user.
+
+**Request body:**
+
+```json
+{
+  "user_uuid": "string",
+  "part_uuids": [
+    "string",
+    "string"
+  ]
+}
+```
+
+**Response:**
+
+```json
+{
+  "order_uuid": "string",
+  "total_price": 123.45
+}
+```
+
+**Behavior:**
+
+- Fetches parts via `InventoryService.ListParts`.
+- Verifies that all parts exist. If at least one is missing — returns an error.
+- Calculates `total_price`.
+- Generates `order_uuid`.
+- Saves the order with status `PENDING_PAYMENT`.
+
+---
+
+#### `POST /api/v1/orders/{order_uuid}/pay` — pay for an order
+
+Processes payment for a previously created order.
+
+**Request body:**
+
+```json
+{
+  "payment_method": "CARD"
+}
+```
+
+**Response:**
+
+```json
+{
+  "transaction_uuid": "string"
+}
+```
+
+**Behavior:**
+
+- Finds the order by `order_uuid`. If it does not exist — returns 404 Not Found.
+- Calls `PaymentService.PayOrder`, passing `user_uuid`, `order_uuid` and `payment_method`. Receives `transaction_uuid`.
+- Updates the order: status → `PAID`, stores `transaction_uuid` and `payment_method`.
+
+---
+
+#### `GET /api/v1/orders/{order_uuid}` — get an order by UUID
+
+Returns order information.
+
+**Response:**
+
+```json
+{
+  "order_uuid": "string",
+  "user_uuid": "string",
+  "part_uuids": [
+    "string"
+  ],
+  "total_price": 123.45,
+  "transaction_uuid": "string",
+  "payment_method": "CARD",
+  "status": "PAID"
+}
+```
+
+**Behavior:**
+
+- Looks up the order by UUID.
+- If found — returns it.
+- If not found — 404 Not Found.
+
+---
+
+#### `POST /api/v1/orders/{order_uuid}/cancel` — cancel an order
+
+Cancels an order.
+
+**Responses:**
+
+- `204 No Content` — order cancelled successfully
+- `404 Not Found` — order not found
+- `409 Conflict` — order is already paid and cannot be cancelled
+
+**Behavior:**
+
+- Checks the order status.
+- If `PENDING_PAYMENT` — changes the status to `CANCELLED`.
+- If `PAID` — returns a 409 error.
+
+---
+
+### 💾 In-memory order structure
+
+| Field            | Type     | Description                                      |
+|------------------|----------|--------------------------------------------------|
+| order_uuid       | string   | Unique order identifier                          |
+| user_uuid        | string   | User UUID                                        |
+| part_uuids       | []string | List of part UUIDs                               |
+| total_price      | double   | Total price                                      |
+| transaction_uuid | *string  | Transaction UUID (if paid)                       |
+| payment_method   | *string  | Payment method (if paid)                         |
+| status           | string   | Status (`PENDING_PAYMENT`, `PAID`, `CANCELLED`)  |
+
+---
+
+### 📦 Enum: PaymentMethod
+
+| Name         | Value | Description                  |
+|--------------|-------|------------------------------|
+| UNKNOWN      | 0     | Unknown method               |
+| CARD         | 1     | Bank card                    |
+| CREDIT_CARD  | 2     | Credit card                  |
+| STORE_CREDIT | 3     | Store balance (bonuses)      |
+
+---

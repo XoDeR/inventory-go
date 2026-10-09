@@ -1,0 +1,35 @@
+post:
+  summary: Pay for an order
+  description: |
+    Processes payment for a previously created order.
+
+    - Finds the order by `order_uuid`. If it does not exist, returns 404 Not Found.
+    - Calls `PaymentService.PayOrder` with `user_uuid`, `order_uuid` and `payment_method`
+      and receives `transaction_uuid`.
+    - Updates the order: status -> `PAID`, stores `transaction_uuid` and `payment_method`.
+  operationId: PayOrder
+  tags:
+    - Order
+  parameters:
+    - $ref: ../params/order_uuid.yaml
+  requestBody:
+    required: true
+    content:
+      application/json:
+        schema:
+          $ref: ../components/schemas/pay_order_request.yaml
+  responses:
+    '200':
+      description: Order paid
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/pay_order_response.yaml
+    '400':
+      $ref: ../components/errors/bad_request.yaml
+    '404':
+      $ref: ../components/errors/not_found.yaml
+    '500':
+      $ref: ../components/errors/internal_server_error.yaml
+    default:
+      $ref: ../components/errors/unexpected_error.yaml

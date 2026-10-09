@@ -1,0 +1,12 @@
+type: string
+description: Payment method
+enum:
+  - UNKNOWN
+  - CARD
+  - CREDIT_CARD
+  - STORE_CREDIT
+x-enum-descriptions:
+  - Unknown method
+  - Bank card
+  - Credit card
+  - Store balance (bonuses)

@@ -1,0 +1,23 @@
+post:
+  summary: Cancel an order
+  description: |
+    Cancels an order.
+
+    - If the status is `PENDING_PAYMENT`, changes it to `CANCELLED`.
+    - If the status is `PAID`, returns 409 Conflict.
+  operationId: CancelOrder
+  tags:
+    - Order
+  parameters:
+    - $ref: ../params/order_uuid.yaml
+  responses:
+    '204':
+      description: Order cancelled successfully
+    '404':
+      $ref: ../components/errors/not_found.yaml
+    '409':
+      $ref: ../components/errors/conflict.yaml
+    '500':
+      $ref: ../components/errors/internal_server_error.yaml
+    default:
+      $ref: ../components/errors/unexpected_error.yaml

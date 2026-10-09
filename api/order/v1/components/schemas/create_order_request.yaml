@@ -1,0 +1,16 @@
+type: object
+required:
+  - user_uuid
+  - part_uuids
+properties:
+  user_uuid:
+    type: string
+    format: uuid
+    description: User UUID
+  part_uuids:
+    type: array
+    description: List of part UUIDs
+    minItems: 1
+    items:
+      type: string
+      format: uuid

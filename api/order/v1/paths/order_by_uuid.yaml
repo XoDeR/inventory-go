@@ -1,0 +1,21 @@
+get:
+  summary: Get an order by UUID
+  description: Looks up the order by UUID and returns it, or 404 Not Found.
+  operationId: GetOrderByUuid
+  tags:
+    - Order
+  parameters:
+    - $ref: ../params/order_uuid.yaml
+  responses:
+    '200':
+      description: Order found
+      content:
+        application/json:
+          schema:
+            $ref: ../components/schemas/order.yaml
+    '404':
+      $ref: ../components/errors/not_found.yaml
+    '500':
+      $ref: ../components/errors/internal_server_error.yaml
+    default:
+      $ref: ../components/errors/unexpected_error.yaml
