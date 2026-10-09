@@ -94,7 +94,9 @@ formatters:
     - gci
   settings:
     gofumpt:
-      extra-rules: true
+      module-path: inventory-go
+      extra:
+        group-params: true
     gci:
       sections:
         - Standard
