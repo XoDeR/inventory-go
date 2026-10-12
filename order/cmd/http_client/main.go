@@ -12,7 +12,7 @@ import (
 
 	"github.com/brianvoe/gofakeit/v7"
 
-	"inventory-go/pkg/models"
+	"inventory-go/shared/pkg/models"
 )
 
 const (

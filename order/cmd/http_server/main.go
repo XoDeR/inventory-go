@@ -17,7 +17,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 
-	orderV1 "inventory-go/pkg/openapi/order/v1"
+	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
 )
 
 const (

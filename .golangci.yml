@@ -47,6 +47,8 @@ linters:
 
   exclusions:
     generated: strict
+    paths:
+      - pkg/openapi
     rules:
       - path: _test\.go
         linters:

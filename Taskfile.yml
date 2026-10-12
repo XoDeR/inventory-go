@@ -14,7 +14,7 @@ vars:
   YQ_VERSION: 'v4.54.1'
   GRPCURL_VERSION: 'v1.9.4'
 
-  MODULES: cmd pkg
+  MODULES: order shared
   BIN_DIR: '{{.ROOT_DIR}}/bin'
   GOFUMPT: '{{.BIN_DIR}}/gofumpt{{exeExt}}'
   GCI: '{{.BIN_DIR}}/gci{{exeExt}}'
@@ -25,10 +25,10 @@ vars:
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
 
-  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/api/order/v1/order.openapi.yaml'
-  OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/api/bundles/order.openapi.v1.bundle.yaml'
+  OPEN_API_ORDER_V1_BASE: '{{.ROOT_DIR}}/shared/api/order/v1/order.openapi.yaml'
+  OPEN_API_ORDER_V1_BUNDLE: '{{.ROOT_DIR}}/shared/api/bundles/order.openapi.v1.bundle.yaml'
 
-  OPEN_API_FILES: '{{.ROOT_DIR}}/api/bundles'
+  OPEN_API_FILES: '{{.ROOT_DIR}}/shared/api/bundles'
 
 tasks:
   install-formatters:
@@ -123,7 +123,7 @@ tasks:
         for mod in {{.MODULES}}; do
           if [ -d "$mod" ]; then
             echo "🔍 Linting module $mod"
-            {{.GOLANGCI_LINT}} run $mod/... --config=.golangci.yml || ERR=1
+            (cd "$mod" && {{.GOLANGCI_LINT}} run ./... --config={{.ROOT_DIR}}/.golangci.yml) || ERR=1
           fi
         done
         exit $ERR

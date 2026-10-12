@@ -1,4 +1,4 @@
-module inventory-go
+module inventory-go/order
 
 go 1.24.2
 
