@@ -1,3 +1,3 @@
 module inventory-go/inventory
 
-go 1.24.2
+go 1.27.2
