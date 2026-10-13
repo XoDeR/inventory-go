@@ -21,6 +21,10 @@ vars:
   GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint{{exeExt}}'
   OGEN: '{{.BIN_DIR}}/ogen{{exeExt}}'
   YQ: '{{.BIN_DIR}}/yq{{exeExt}}'
+  BUF: '{{.BIN_DIR}}/buf'
+  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go'
+  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc'
+  GRPCURL: '{{.BIN_DIR}}/grpcurl'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
@@ -186,3 +190,64 @@ tasks:
           echo '📦 Installing yq...'
           GOBIN={{.BIN_DIR}} go install github.com/mikefarah/yq/v4@{{.YQ_VERSION}}
         }
+
+  install-buf:
+    desc: "Installs Buf into the bin directory"
+    cmds:
+      - |
+        [ -f {{.BUF}} ] || {
+          mkdir -p {{.BIN_DIR}} tmp-buf
+          curl -sSL \
+            "https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-$(uname -s)-$(uname -m).tar.gz" \
+            | tar -xz -C tmp-buf
+          mv tmp-buf/buf/bin/buf {{.BUF}}
+          rm -rf tmp-buf
+          chmod +x {{.BUF}}
+        }
+
+  proto:install-plugins:
+    desc: "Installs the protoc plugins into the bin directory"
+    cmds:
+      - |
+        [ -f {{.PROTOC_GEN_GO}} ] || {
+          echo '📦 Installing protoc-gen-go...'
+          GOBIN={{.BIN_DIR}} go install google.golang.org/protobuf/cmd/protoc-gen-go@{{.PROTOC_GEN_GO_VERSION}}
+        }
+        [ -f {{.PROTOC_GEN_GO_GRPC}} ] || {
+          echo '📦 Installing protoc-gen-go-grpc...'
+          GOBIN={{.BIN_DIR}} go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@{{.PROTOC_GEN_GO_GRPC_VERSION}}
+        }
+
+  proto:gen:
+    deps: [ install-buf, proto:install-plugins, proto:lint ]
+    desc: Generate Go code from .proto
+    dir: shared/proto
+    cmds:
+      - '{{.BUF}} generate'
+
+  proto:lint:
+    deps: [ install-buf, proto:install-plugins ]
+    desc: Check .proto files for style compliance
+    dir: shared/proto
+    cmds:
+      - '{{.BUF}} lint'
+
+  gen:
+    desc: "Generate all proto and OpenAPI declarations"
+    cmds:
+      - task: proto:gen
+      - task: ogen:gen
+    
+  grpcurl:install:
+    desc: "Installs grpcurl into the bin directory"
+    cmds:
+      - |
+        [ -f {{.GRPCURL}} ] || {
+          echo '📦 Installing grpcurl {{.GRPCURL_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install github.com/fullstorydev/grpcurl/cmd/grpcurl@{{.GRPCURL_VERSION}}
+        }
+    status:
+      - test -x {{.GRPCURL}}
+
+
+
