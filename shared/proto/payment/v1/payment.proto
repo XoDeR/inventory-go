@@ -12,8 +12,8 @@ service PaymentService {
 
 // PaymentMethod is the payment method selected by the user.
 enum PaymentMethod {
-  // Unknown method
-  PAYMENT_METHOD_UNKNOWN = 0;
+  // Unspecified method
+  PAYMENT_METHOD_UNSPECIFIED = 0;
   // Bank card
   PAYMENT_METHOD_CARD = 1;
   // Credit card
@@ -22,6 +22,7 @@ enum PaymentMethod {
   PAYMENT_METHOD_STORE_CREDIT = 3;
 }
 
+// PayOrderRequest is the request for PaymentService.PayOrder.
 message PayOrderRequest {
   // Order UUID
   string order_uuid = 1;
@@ -31,6 +32,7 @@ message PayOrderRequest {
   PaymentMethod payment_method = 3;
 }
 
+// PayOrderResponse is the response for PaymentService.PayOrder.
 message PayOrderResponse {
   // Payment transaction UUID
   string transaction_uuid = 1;

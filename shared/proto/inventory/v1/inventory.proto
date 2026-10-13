@@ -16,21 +16,25 @@ service InventoryService {
   rpc ListParts(ListPartsRequest) returns (ListPartsResponse);
 }
 
+// GetPartRequest is the request for InventoryService.GetPart.
 message GetPartRequest {
   // Part identifier
   string uuid = 1;
 }
 
+// GetPartResponse is the response for InventoryService.GetPart.
 message GetPartResponse {
   // Part information
   Part part = 1;
 }
 
+// ListPartsRequest is the request for InventoryService.ListParts.
 message ListPartsRequest {
   // Parts filter (all fields are optional)
   PartsFilter filter = 1;
 }
 
+// ListPartsResponse is the response for InventoryService.ListParts.
 message ListPartsResponse {
   // List of matching parts
   repeated Part parts = 1;
@@ -45,6 +49,7 @@ message PartsFilter {
   repeated string tags = 5;
 }
 
+// Part is a computer part stored in the inventory.
 message Part {
   // Unique part identifier
   string uuid = 1;
@@ -65,14 +70,16 @@ message Part {
   google.protobuf.Timestamp updated_at = 12;
 }
 
+// Category is the kind of a computer part.
 enum Category {
-  CATEGORY_UNKNOWN = 0; // Unknown category
+  CATEGORY_UNSPECIFIED = 0; // Unspecified category
   CATEGORY_CPU = 1; // Processor
   CATEGORY_GPU = 2; // Graphics card
   CATEGORY_RAM = 3; // Memory (RAM)
   CATEGORY_STORAGE = 4; // Storage drive (SSD/HDD)
 }
 
+// Dimensions describes the physical size and weight of a part.
 message Dimensions {
   // Length in cm
   double length = 1;
@@ -84,6 +91,7 @@ message Dimensions {
   double weight = 4;
 }
 
+// Manufacturer describes the company that makes a part.
 message Manufacturer {
   string name = 1;
   // Country of origin
