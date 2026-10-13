@@ -21,10 +21,10 @@ vars:
   GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint{{exeExt}}'
   OGEN: '{{.BIN_DIR}}/ogen{{exeExt}}'
   YQ: '{{.BIN_DIR}}/yq{{exeExt}}'
-  BUF: '{{.BIN_DIR}}/buf'
-  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go'
-  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc'
-  GRPCURL: '{{.BIN_DIR}}/grpcurl'
+  BUF: '{{.BIN_DIR}}/buf{{exeExt}}'
+  PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go{{exeExt}}'
+  PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc{{exeExt}}'
+  GRPCURL: '{{.BIN_DIR}}/grpcurl{{exeExt}}'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
@@ -196,13 +196,8 @@ tasks:
     cmds:
       - |
         [ -f {{.BUF}} ] || {
-          mkdir -p {{.BIN_DIR}} tmp-buf
-          curl -sSL \
-            "https://github.com/bufbuild/buf/releases/download/v{{.BUF_VERSION}}/buf-$(uname -s)-$(uname -m).tar.gz" \
-            | tar -xz -C tmp-buf
-          mv tmp-buf/buf/bin/buf {{.BUF}}
-          rm -rf tmp-buf
-          chmod +x {{.BUF}}
+          echo '📦 Installing buf v{{.BUF_VERSION}}...'
+          GOBIN={{.BIN_DIR}} go install github.com/bufbuild/buf/cmd/buf@v{{.BUF_VERSION}}
         }
 
   proto:install-plugins:
