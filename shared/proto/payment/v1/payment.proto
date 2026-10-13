@@ -1,0 +1,37 @@
+syntax = "proto3";
+
+package payment.v1;
+
+option go_package = "inventory-go/shared/pkg/proto/payment/v1;payment_v1";
+
+// PaymentService simulates a payment gateway. It does not store state.
+service PaymentService {
+  // PayOrder processes a payment command and returns a transaction UUID.
+  rpc PayOrder(PayOrderRequest) returns (PayOrderResponse);
+}
+
+// PaymentMethod is the payment method selected by the user.
+enum PaymentMethod {
+  // Unknown method
+  PAYMENT_METHOD_UNKNOWN = 0;
+  // Bank card
+  PAYMENT_METHOD_CARD = 1;
+  // Credit card
+  PAYMENT_METHOD_CREDIT_CARD = 2;
+  // Store balance (internal method)
+  PAYMENT_METHOD_STORE_CREDIT = 3;
+}
+
+message PayOrderRequest {
+  // Order UUID
+  string order_uuid = 1;
+  // UUID of the user initiating the payment
+  string user_uuid = 2;
+  // Selected payment method
+  PaymentMethod payment_method = 3;
+}
+
+message PayOrderResponse {
+  // Payment transaction UUID
+  string transaction_uuid = 1;
+}
