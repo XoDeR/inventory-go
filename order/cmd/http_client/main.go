@@ -68,11 +68,19 @@ func getOrder(ctx context.Context, client *orderV1.Client, orderUUID uuid.UUID) 
 	}
 }
 
-// generateRandomOrderRequest builds a request with random user and parts
+// seededPartUuids are the parts the inventory service starts with
+var seededPartUuids = []string{
+	"6f1c8a4e-3b52-4d7a-9c10-1a2b3c4d5e01",
+	"6f1c8a4e-3b52-4d7a-9c10-1a2b3c4d5e02",
+	"6f1c8a4e-3b52-4d7a-9c10-1a2b3c4d5e03",
+	"6f1c8a4e-3b52-4d7a-9c10-1a2b3c4d5e04",
+}
+
+// generateRandomOrderRequest builds a request with a random user and parts known to the inventory
 func generateRandomOrderRequest() *orderV1.CreateOrderRequest {
-	partUuids := make([]uuid.UUID, gofakeit.IntRange(1, 5))
+	partUuids := make([]uuid.UUID, gofakeit.IntRange(1, len(seededPartUuids)))
 	for i := range partUuids {
-		partUuids[i] = uuid.New()
+		partUuids[i] = uuid.MustParse(seededPartUuids[i])
 	}
 
 	return &orderV1.CreateOrderRequest{

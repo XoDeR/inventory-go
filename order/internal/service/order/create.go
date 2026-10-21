@@ -3,7 +3,6 @@ package order
 import (
 	"context"
 
-	"github.com/brianvoe/gofakeit/v7"
 	"github.com/google/uuid"
 
 	"inventory-go/order/internal/model"
@@ -14,11 +13,28 @@ func (s *service) Create(ctx context.Context, info model.CreateOrderInfo) (model
 		return model.Order{}, model.ErrEmptyPartUuids
 	}
 
-	// TODO: fetch parts via InventoryService.ListParts, return an error if any is missing
-	// and sum their real prices. Until the inventory client exists, prices are generated.
+	uuids := make([]string, 0, len(info.PartUuids))
+	for _, partUUID := range info.PartUuids {
+		uuids = append(uuids, partUUID.String())
+	}
+
+	parts, err := s.inventoryClient.ListParts(ctx, model.PartsFilter{Uuids: uuids})
+	if err != nil {
+		return model.Order{}, err
+	}
+
+	prices := make(map[string]float64, len(parts))
+	for _, part := range parts {
+		prices[part.Uuid] = part.Price
+	}
+
 	var totalPrice float64
-	for range info.PartUuids {
-		totalPrice += gofakeit.Price(100, 1000)
+	for _, id := range uuids {
+		price, ok := prices[id]
+		if !ok {
+			return model.Order{}, model.ErrPartsNotFound
+		}
+		totalPrice += price
 	}
 
 	order := model.Order{

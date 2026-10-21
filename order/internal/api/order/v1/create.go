@@ -14,7 +14,7 @@ import (
 func (a *api) CreateOrder(ctx context.Context, req *orderV1.CreateOrderRequest) (orderV1.CreateOrderRes, error) {
 	order, err := a.orderService.Create(ctx, converter.CreateOrderInfoToModel(req))
 	if err != nil {
-		if errors.Is(err, model.ErrEmptyPartUuids) {
+		if errors.Is(err, model.ErrEmptyPartUuids) || errors.Is(err, model.ErrPartsNotFound) {
 			return &orderV1.CreateOrderBadRequest{
 				Code:    http.StatusBadRequest,
 				Message: err.Error(),

@@ -14,9 +14,19 @@ func (s *service) Pay(ctx context.Context, orderUUID uuid.UUID, method model.Pay
 		return uuid.Nil, err
 	}
 
-	// TODO: call PaymentService.PayOrder with user_uuid, order_uuid and payment_method.
-	// Until the payment client exists, the transaction uuid is generated locally.
-	transactionUUID := uuid.New()
+	transactionID, err := s.paymentClient.PayOrder(ctx, model.PayOrderInfo{
+		OrderUuid:     order.Uuid,
+		UserUuid:      order.UserUuid,
+		PaymentMethod: method,
+	})
+	if err != nil {
+		return uuid.Nil, err
+	}
+
+	transactionUUID, err := uuid.Parse(transactionID)
+	if err != nil {
+		return uuid.Nil, err
+	}
 
 	order.Status = model.OrderStatusPaid
 	order.TransactionUuid = &transactionUUID
