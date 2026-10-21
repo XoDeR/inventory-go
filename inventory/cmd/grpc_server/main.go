@@ -112,6 +112,10 @@ func main() {
 		parts: make(map[string]*inventoryV1.Part),
 	}
 
+	for _, part := range seedParts() {
+		service.parts[part.GetUuid()] = part
+	}
+
 	inventoryV1.RegisterInventoryServiceServer(s, service)
 
 	reflection.Register(s)
