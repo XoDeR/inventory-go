@@ -269,5 +269,192 @@ tasks:
     status:
       - test -x {{.GRPCURL}}
 
+  test-api:
+    desc: "🧪 Run tests to check the microservices API"
+    deps: [ grpcurl:install ]
+    cmds:
+      - |
+        echo "🧪 Testing the microservices API via gRPC and REST"
+
+        # json_get KEY JSON: prints the string value of the first KEY in JSON.
+        # Works on Windows (Git Bash / Task's shell) and Unix: a literal double quote is never
+        # passed as a command argument (on Windows it gets mangled into \" and breaks cut),
+        # so tr splits on the quote by its octal code (\042) instead.
+        # Handles both compact and pretty-printed JSON: after the split the value is
+        # two lines below the key line.
+        json_get() {
+          printf '%s' "$2" | tr -d '\r' | tr '\042' '\n' | grep -m1 -A2 -x "$1" | tail -n 1
+        }
+
+        echo "📦 Test 1: Getting the list of parts from Inventory"
+        PARTS_RESPONSE=$({{.GRPCURL}} -plaintext -d '{"filter":{}}' localhost:50051 inventory.v1.InventoryService/ListParts)
+        
+        if [[ -z "$PARTS_RESPONSE" || "$PARTS_RESPONSE" == *"error"* ]]; then
+          echo "❌ Failed to get the list of parts."
+          echo "🔍 Server response: $PARTS_RESPONSE"
+          exit 1
+        fi
+        
+        # Extract the UUID of the first part for further tests
+        PART_UUID=$(json_get uuid "$PARTS_RESPONSE")
+        if [ -z "$PART_UUID" ]; then
+          echo "❌ Failed to find the part UUID in the response."
+          echo "🔍 Server response: $PARTS_RESPONSE"
+          exit 1
+        fi
+        echo "✅ Successfully got the list of parts, first UUID: $PART_UUID"
+        
+        echo
+        echo "🔍 Test 2: Getting part information by UUID"
+        PART_RESPONSE=$({{.GRPCURL}} -plaintext -d "{\"uuid\":\"$PART_UUID\"}" localhost:50051 inventory.v1.InventoryService/GetPart)
+        
+        if [[ -z "$PART_RESPONSE" || "$PART_RESPONSE" == *"error"* ]]; then
+          echo "❌ Failed to get the part information."
+          echo "🔍 Server response: $PART_RESPONSE"
+          exit 1
+        fi
+        
+        # Extract the part name 
+        PART_NAME=$(json_get name "$PART_RESPONSE")
+        if [ -z "$PART_NAME" ]; then
+          echo "❌ Failed to extract the part name from the response."
+          echo "🔍 Server response: $PART_RESPONSE"
+          exit 1
+        fi
+        echo "✅ Successfully got the part: $PART_NAME"
+        
+        echo
+        echo "👤 Test 3: Creating a user for the tests"
+        # Generate a unique UUID for the user
+        # uuidgen is missing on Windows, fall back to the kernel (Linux) or PowerShell
+        USER_UUID=$( (uuidgen 2>/dev/null || cat /proc/sys/kernel/random/uuid 2>/dev/null || powershell.exe -NoProfile -Command '[guid]::NewGuid().ToString()') | tr -d '\r' | tr '[:upper:]' '[:lower:]')
+        echo "✅ User UUID generated: $USER_UUID"
+        
+        echo
+        echo "📝 Test 4: Creating an order (REST API)"
+        ORDER_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/v1/orders" \
+          -H "Content-Type: application/json" \
+          -d "{\"user_uuid\":\"$USER_UUID\",\"part_uuids\":[\"$PART_UUID\"]}")
+        
+        if [[ -z "$ORDER_RESPONSE" || "$ORDER_RESPONSE" == *"error"* ]]; then
+          echo "❌ Failed to create the order."
+          echo "🔍 Server response: $ORDER_RESPONSE"
+          exit 1
+        fi
+        
+        # Extract the order UUID, taking different JSON formats into account
+        ORDER_UUID=$(json_get uuid "$ORDER_RESPONSE")
+        if [ -z "$ORDER_UUID" ]; then
+          echo "❌ Failed to extract the order UUID from the response."
+          echo "🔍 Server response: $ORDER_RESPONSE"
+          exit 1
+        fi
+        echo "✅ Successfully created the order with UUID: $ORDER_UUID"
+        
+        echo
+        echo "📊 Test 5: Checking the initial order status (should be PENDING_PAYMENT)"
+        ORDER_INFO_RESPONSE=$(curl -s -X GET "http://localhost:8080/api/v1/orders/$ORDER_UUID")
+        
+        if [[ -z "$ORDER_INFO_RESPONSE" || "$ORDER_INFO_RESPONSE" == *"error"* ]]; then
+          echo "❌ Failed to get the order information."
+          echo "🔍 Server response: $ORDER_INFO_RESPONSE"
+          exit 1
+        fi
+        
+        # Extract the order status, taking different JSON formats into account
+        ORDER_STATUS=$(json_get status "$ORDER_INFO_RESPONSE")
+        if [ -z "$ORDER_STATUS" ]; then
+          echo "❌ Failed to extract the order status from the response."
+          echo "🔍 Server response: $ORDER_INFO_RESPONSE"
+          exit 1
+        fi
+        
+        # Check that the initial status is PENDING_PAYMENT
+        if [[ "$ORDER_STATUS" != *"PENDING_PAYMENT"* ]]; then
+          echo "❌ Wrong initial order status. Expected PENDING_PAYMENT, got: $ORDER_STATUS"
+          exit 1
+        fi
+        echo "✅ Initial order status is correct: $ORDER_STATUS"
+        
+        echo
+        echo "💰 Test 6: Paying for the order (REST API)"
+        PAY_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/v1/orders/$ORDER_UUID/pay" \
+          -H "Content-Type: application/json" \
+          -d "{\"payment_method\":\"PAYMENT_METHOD_CARD\"}")
+        
+        if [[ "$PAY_RESPONSE" == *"error"* ]]; then
+          echo "❌ Error while paying for the order."
+          echo "🔍 Server response: $PAY_RESPONSE"
+          exit 1
+        fi
+        echo "✅ Order paid successfully"
+        
+        echo
+        echo "📊 Test 7: Checking the status after payment (should be PAID)"
+        ORDER_INFO_RESPONSE=$(curl -s -X GET "http://localhost:8080/api/v1/orders/$ORDER_UUID")
+        
+        # Extract the order status
+        ORDER_STATUS=$(json_get status "$ORDER_INFO_RESPONSE")
+        
+        # Check that the status became PAID
+        if [[ "$ORDER_STATUS" != *"PAID"* && "$ORDER_STATUS" != *"ASSEMBLED"* ]]; then
+          echo "❌ Wrong order status after payment. Expected PAID or ASSEMBLED, got: $ORDER_STATUS"
+          exit 1
+        fi
+        echo "✅ Order status after payment: $ORDER_STATUS"
+        
+        echo
+        echo "📝 Test 8: Creating a second order to cancel (REST API)"
+        ORDER2_RESPONSE=$(curl -s -X POST "http://localhost:8080/api/v1/orders" \
+          -H "Content-Type: application/json" \
+          -d "{\"user_uuid\":\"$USER_UUID\",\"part_uuids\":[\"$PART_UUID\"]}")
+        
+        if [[ -z "$ORDER2_RESPONSE" || "$ORDER2_RESPONSE" == *"error"* ]]; then
+          echo "❌ Failed to create the second order."
+          echo "🔍 Server response: $ORDER2_RESPONSE"
+          exit 1
+        fi
+        
+        # Extract the UUID of the second order, taking different JSON formats into account
+        ORDER2_UUID=$(json_get uuid "$ORDER2_RESPONSE")
+        if [ -z "$ORDER2_UUID" ]; then
+          echo "❌ Failed to extract the UUID of the second order from the response."
+          echo "🔍 Server response: $ORDER2_RESPONSE"
+          exit 1
+        fi
+        echo "✅ Successfully created the second order with UUID: $ORDER2_UUID"
+        
+        # Check its initial status
+        ORDER2_INFO=$(curl -s -X GET "http://localhost:8080/api/v1/orders/$ORDER2_UUID")
+        ORDER2_STATUS=$(json_get status "$ORDER2_INFO")
+
+        if [[ "$ORDER2_STATUS" != *"PENDING_PAYMENT"* ]]; then
+          echo "❌ Wrong initial status of the second order. Expected PENDING_PAYMENT, got: $ORDER2_STATUS"
+          exit 1
+        fi
+        echo "✅ Initial status of the second order: $ORDER2_STATUS"
+        
+        echo
+        echo "❌ Test 9: Cancelling the second order (REST API)"
+        echo "Waiting 2 seconds before cancelling..."
+        sleep 2
+        
+        curl -s -X POST "http://localhost:8080/api/v1/orders/$ORDER2_UUID/cancel"
+        
+        echo "Checking the status after cancellation..."
+        
+        ORDER2_INFO=$(curl -s -X GET "http://localhost:8080/api/v1/orders/$ORDER2_UUID")
+        ORDER2_STATUS=$(json_get status "$ORDER2_INFO")
+
+        if [[ "$ORDER2_STATUS" != *"CANCELLED"* ]]; then
+          echo "❌ Wrong status of the cancelled order. Expected CANCELLED, got: $ORDER2_STATUS"
+          echo "🔍 Order details: $ORDER2_INFO"
+          exit 1
+        fi
+        echo "✅ Status of the second order after cancellation: $ORDER2_STATUS"
+        
+        echo
+        echo "🎉 All API tests completed successfully!"
+
 
 
