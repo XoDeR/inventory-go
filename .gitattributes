@@ -1,0 +1,14 @@
+# Handle line endings automatically for text files
+* text=auto
+
+# Force Go files to always use LF line endings
+*.go text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
+
+# Explicitly ensure shell scripts use LF
+*.sh text eol=lf
+
+# Windows batch files must retain CRLF to prevent execution errors
+*.bat text eol=crlf
+*.cmd text eol=crlf
