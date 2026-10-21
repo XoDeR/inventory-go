@@ -12,12 +12,12 @@ vars:
   PROTOC_GEN_GO_GRPC_VERSION: 'v1.6.2'
   PROTOC_GEN_GRPC_GATEWAY_VERSION: 'v2.26.3'
   PROTOC_GEN_OPENAPIV2_VERSION: 'v2.26.3'
-  PROTOC_GEN_VALIDATE_VERSION: 'v1.2.1'
+  PROTOC_GEN_VALIDATE_VERSION: 'v1.3.3'
   OGEN_VERSION: 'v1.24.0'
   YQ_VERSION: 'v4.54.1'
   GRPCURL_VERSION: 'v1.9.4'
 
-  MODULES: order shared
+  MODULES: inventory order payment shared
   BIN_DIR: '{{.ROOT_DIR}}/bin'
   GOFUMPT: '{{.BIN_DIR}}/gofumpt{{exeExt}}'
   GCI: '{{.BIN_DIR}}/gci{{exeExt}}'

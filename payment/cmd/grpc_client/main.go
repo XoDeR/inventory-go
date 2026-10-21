@@ -2,13 +2,14 @@ package main
 
 import (
 	"context"
-	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 	"log"
 	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+
+	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
 
 const serverAddress = "localhost:50052"

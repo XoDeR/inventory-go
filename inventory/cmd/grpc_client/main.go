@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 	"log"
 	"time"
 
@@ -11,6 +10,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+
+	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 
 const serverAddress = "localhost:50051"
