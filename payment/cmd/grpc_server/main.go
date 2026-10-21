@@ -12,14 +12,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
 
+	paymentV1API "inventory-go/payment/internal/api/payment/v1"
+	paymentService "inventory-go/payment/internal/service/payment"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
@@ -29,30 +28,6 @@ const (
 	grpcPort = 50052
 	httpPort = 8082
 )
-
-type paymentService struct {
-	paymentV1.UnimplementedPaymentServiceServer
-}
-
-// PayOrder simulates a payment: it validates the request, logs it and
-// returns a new transaction UUID. No state is stored.
-func (s *paymentService) PayOrder(_ context.Context, req *paymentV1.PayOrderRequest) (*paymentV1.PayOrderResponse, error) {
-	if req.GetOrderUuid() == "" {
-		return nil, status.Error(codes.InvalidArgument, "order_uuid is required")
-	}
-	if req.GetUserUuid() == "" {
-		return nil, status.Error(codes.InvalidArgument, "user_uuid is required")
-	}
-	if req.GetPaymentMethod() == paymentV1.PaymentMethod_PAYMENT_METHOD_UNSPECIFIED {
-		return nil, status.Error(codes.InvalidArgument, "payment_method is required")
-	}
-
-	transactionUUID := uuid.NewString()
-	log.Printf("Payment successful, order_uuid: %s, user_uuid: %s, method: %s, transaction_uuid: %s\n",
-		req.GetOrderUuid(), req.GetUserUuid(), req.GetPaymentMethod(), transactionUUID)
-
-	return &paymentV1.PayOrderResponse{TransactionUuid: transactionUUID}, nil
-}
 
 func main() {
 	// listener
@@ -69,7 +44,10 @@ func main() {
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor.UnaryValidate()))
 
-	paymentV1.RegisterPaymentServiceServer(s, &paymentService{})
+	service := paymentService.NewService()
+	api := paymentV1API.NewAPI(service)
+
+	paymentV1.RegisterPaymentServiceServer(s, api)
 
 	reflection.Register(s)
 
