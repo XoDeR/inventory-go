@@ -2,12 +2,20 @@ syntax = "proto3";
 
 package payment.v1;
 
+import "google/api/annotations.proto";
+import "validate/validate.proto";
+
 option go_package = "inventory-go/shared/pkg/proto/payment/v1;payment_v1";
 
 // PaymentService simulates a payment gateway. It does not store state.
 service PaymentService {
   // PayOrder processes a payment command and returns a transaction UUID.
-  rpc PayOrder(PayOrderRequest) returns (PayOrderResponse);
+  rpc PayOrder(PayOrderRequest) returns (PayOrderResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/payment/pay"
+      body: "*"
+    };
+  }
 }
 
 // PaymentMethod is the payment method selected by the user.
@@ -25,11 +33,11 @@ enum PaymentMethod {
 // PayOrderRequest is the request for PaymentService.PayOrder.
 message PayOrderRequest {
   // Order UUID
-  string order_uuid = 1;
+  string order_uuid = 1 [(validate.rules).string.uuid = true];
   // UUID of the user initiating the payment
-  string user_uuid = 2;
+  string user_uuid = 2 [(validate.rules).string.uuid = true];
   // Selected payment method
-  PaymentMethod payment_method = 3;
+  PaymentMethod payment_method = 3 [(validate.rules).enum = {defined_only: true, not_in: [0]}];
 }
 
 // PayOrderResponse is the response for PaymentService.PayOrder.

@@ -10,6 +10,9 @@ vars:
   BUF_VERSION: '1.73.0'
   PROTOC_GEN_GO_VERSION: 'v1.36.12'
   PROTOC_GEN_GO_GRPC_VERSION: 'v1.6.2'
+  PROTOC_GEN_GRPC_GATEWAY_VERSION: 'v2.26.3'
+  PROTOC_GEN_OPENAPIV2_VERSION: 'v2.26.3'
+  PROTOC_GEN_VALIDATE_VERSION: 'v1.2.1'
   OGEN_VERSION: 'v1.24.0'
   YQ_VERSION: 'v4.54.1'
   GRPCURL_VERSION: 'v1.9.4'
@@ -24,6 +27,9 @@ vars:
   BUF: '{{.BIN_DIR}}/buf{{exeExt}}'
   PROTOC_GEN_GO: '{{.BIN_DIR}}/protoc-gen-go{{exeExt}}'
   PROTOC_GEN_GO_GRPC: '{{.BIN_DIR}}/protoc-gen-go-grpc{{exeExt}}'
+  PROTOC_GEN_GRPC_GATEWAY: '{{.BIN_DIR}}/protoc-gen-grpc-gateway{{exeExt}}'
+  PROTOC_GEN_OPENAPIV2: '{{.BIN_DIR}}/protoc-gen-openapiv2{{exeExt}}'
+  PROTOC_GEN_VALIDATE: '{{.BIN_DIR}}/protoc-gen-validate{{exeExt}}'
   GRPCURL: '{{.BIN_DIR}}/grpcurl{{exeExt}}'
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
@@ -212,6 +218,18 @@ tasks:
           echo '📦 Installing protoc-gen-go-grpc...'
           GOBIN={{.BIN_DIR}} go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@{{.PROTOC_GEN_GO_GRPC_VERSION}}
         }
+        [ -f {{.PROTOC_GEN_GRPC_GATEWAY}} ] || {
+          echo '📦 Installing protoc-gen-grpc-gateway...'
+          GOBIN={{.BIN_DIR}} go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-grpc-gateway@{{.PROTOC_GEN_GRPC_GATEWAY_VERSION}}
+        }
+        [ -f {{.PROTOC_GEN_OPENAPIV2}} ] || {
+          echo '📦 Installing protoc-gen-openapiv2...'
+          GOBIN={{.BIN_DIR}} go install github.com/grpc-ecosystem/grpc-gateway/v2/protoc-gen-openapiv2@{{.PROTOC_GEN_OPENAPIV2_VERSION}}
+        }
+        [ -f {{.PROTOC_GEN_VALIDATE}} ] || {
+          echo '📦 Installing protoc-gen-validate...'
+          GOBIN={{.BIN_DIR}} go install github.com/envoyproxy/protoc-gen-validate@{{.PROTOC_GEN_VALIDATE_VERSION}}
+        }
 
   proto:gen:
     deps: [ install-buf, proto:install-plugins, proto:lint ]
@@ -220,8 +238,15 @@ tasks:
     cmds:
       - '{{.BUF}} generate'
 
+  proto:update-deps:
+    deps: [ install-buf ]
+    desc: Updates buf dependencies (googleapis, protoc-gen-validate) and buf.lock
+    dir: shared/proto
+    cmds:
+      - '{{.BUF}} dep update'
+
   proto:lint:
-    deps: [ install-buf, proto:install-plugins ]
+    deps: [ install-buf, proto:install-plugins, proto:update-deps ]
     desc: Check .proto files for style compliance
     dir: shared/proto
     cmds:

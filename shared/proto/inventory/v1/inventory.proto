@@ -2,24 +2,34 @@ syntax = "proto3";
 
 package inventory.v1;
 
+import "google/api/annotations.proto";
 import "google/protobuf/timestamp.proto";
+import "validate/validate.proto";
 
 option go_package = "inventory-go/shared/pkg/proto/inventory/v1;inventory_v1";
 
 // InventoryService stores and serves information about computer parts.
 service InventoryService {
   // GetPart returns a part by its UUID. Returns NotFound if it does not exist.
-  rpc GetPart(GetPartRequest) returns (GetPartResponse);
+  rpc GetPart(GetPartRequest) returns (GetPartResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/inventory/parts/{uuid}"
+    };
+  }
 
   // ListParts returns parts matching the filter.
   // OR within a single filter field, AND between different fields.
-  rpc ListParts(ListPartsRequest) returns (ListPartsResponse);
+  rpc ListParts(ListPartsRequest) returns (ListPartsResponse) {
+    option (google.api.http) = {
+      get: "/api/v1/inventory/parts"
+    };
+  }
 }
 
 // GetPartRequest is the request for InventoryService.GetPart.
 message GetPartRequest {
   // Part identifier
-  string uuid = 1;
+  string uuid = 1 [(validate.rules).string.uuid = true];
 }
 
 // GetPartResponse is the response for InventoryService.GetPart.
@@ -42,7 +52,7 @@ message ListPartsResponse {
 
 // PartsFilter: an empty field means "do not filter by this field".
 message PartsFilter {
-  repeated string uuids = 1;
+  repeated string uuids = 1 [(validate.rules).repeated.items.string.uuid = true];
   repeated string names = 2;
   repeated Category categories = 3;
   repeated string manufacturer_countries = 4;

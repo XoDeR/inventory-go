@@ -1,0 +1,356 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "inventory/v1/inventory.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "InventoryService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {
+    "/api/v1/inventory/parts": {
+      "get": {
+        "summary": "ListParts returns parts matching the filter.\nOR within a single filter field, AND between different fields.",
+        "operationId": "InventoryService_ListParts",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1ListPartsResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "filter.uuids",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "filter.names",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "filter.categories",
+            "description": " - CATEGORY_UNSPECIFIED: Unspecified category\n - CATEGORY_CPU: Processor\n - CATEGORY_GPU: Graphics card\n - CATEGORY_RAM: Memory (RAM)\n - CATEGORY_STORAGE: Storage drive (SSD/HDD)",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "CATEGORY_UNSPECIFIED",
+                "CATEGORY_CPU",
+                "CATEGORY_GPU",
+                "CATEGORY_RAM",
+                "CATEGORY_STORAGE"
+              ]
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "filter.manufacturer_countries",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          },
+          {
+            "name": "filter.tags",
+            "in": "query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "tags": [
+          "InventoryService"
+        ]
+      }
+    },
+    "/api/v1/inventory/parts/{uuid}": {
+      "get": {
+        "summary": "GetPart returns a part by its UUID. Returns NotFound if it does not exist.",
+        "operationId": "InventoryService_GetPart",
+        "responses": {
+          "200": {
+            "description": "A successful response.",
+            "schema": {
+              "$ref": "#/definitions/v1GetPartResponse"
+            }
+          },
+          "default": {
+            "description": "An unexpected error response.",
+            "schema": {
+              "$ref": "#/definitions/rpcStatus"
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "uuid",
+            "description": "Part identifier",
+            "in": "path",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "tags": [
+          "InventoryService"
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1Category": {
+      "type": "string",
+      "enum": [
+        "CATEGORY_UNSPECIFIED",
+        "CATEGORY_CPU",
+        "CATEGORY_GPU",
+        "CATEGORY_RAM",
+        "CATEGORY_STORAGE"
+      ],
+      "default": "CATEGORY_UNSPECIFIED",
+      "description": "Category is the kind of a computer part.\n\n - CATEGORY_UNSPECIFIED: Unspecified category\n - CATEGORY_CPU: Processor\n - CATEGORY_GPU: Graphics card\n - CATEGORY_RAM: Memory (RAM)\n - CATEGORY_STORAGE: Storage drive (SSD/HDD)"
+    },
+    "v1Dimensions": {
+      "type": "object",
+      "properties": {
+        "length": {
+          "type": "number",
+          "format": "double",
+          "title": "Length in cm"
+        },
+        "width": {
+          "type": "number",
+          "format": "double",
+          "title": "Width in cm"
+        },
+        "height": {
+          "type": "number",
+          "format": "double",
+          "title": "Height in cm"
+        },
+        "weight": {
+          "type": "number",
+          "format": "double",
+          "title": "Weight in kg"
+        }
+      },
+      "description": "Dimensions describes the physical size and weight of a part."
+    },
+    "v1GetPartResponse": {
+      "type": "object",
+      "properties": {
+        "part": {
+          "$ref": "#/definitions/v1Part",
+          "title": "Part information"
+        }
+      },
+      "description": "GetPartResponse is the response for InventoryService.GetPart."
+    },
+    "v1ListPartsResponse": {
+      "type": "object",
+      "properties": {
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1Part"
+          },
+          "title": "List of matching parts"
+        }
+      },
+      "description": "ListPartsResponse is the response for InventoryService.ListParts."
+    },
+    "v1Manufacturer": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "country": {
+          "type": "string",
+          "title": "Country of origin"
+        },
+        "website": {
+          "type": "string"
+        }
+      },
+      "description": "Manufacturer describes the company that makes a part."
+    },
+    "v1Part": {
+      "type": "object",
+      "properties": {
+        "uuid": {
+          "type": "string",
+          "title": "Unique part identifier"
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "price": {
+          "type": "number",
+          "format": "double",
+          "title": "Price per unit"
+        },
+        "stock_quantity": {
+          "type": "string",
+          "format": "int64",
+          "title": "Quantity in stock"
+        },
+        "category": {
+          "$ref": "#/definitions/v1Category"
+        },
+        "dimensions": {
+          "$ref": "#/definitions/v1Dimensions"
+        },
+        "manufacturer": {
+          "$ref": "#/definitions/v1Manufacturer"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags for quick search"
+        },
+        "metadata": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/v1Value"
+          },
+          "title": "Flexible metadata"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "description": "Part is a computer part stored in the inventory."
+    },
+    "v1PartsFilter": {
+      "type": "object",
+      "properties": {
+        "uuids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "categories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/v1Category"
+          }
+        },
+        "manufacturer_countries": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "description": "PartsFilter: an empty field means \"do not filter by this field\"."
+    },
+    "v1Value": {
+      "type": "object",
+      "properties": {
+        "string_value": {
+          "type": "string"
+        },
+        "int64_value": {
+          "type": "string",
+          "format": "int64"
+        },
+        "double_value": {
+          "type": "number",
+          "format": "double"
+        },
+        "bool_value": {
+          "type": "boolean"
+        }
+      },
+      "description": "Value is a metadata value of one of the listed types."
+    }
+  }
+}
