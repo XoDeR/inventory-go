@@ -43,14 +43,14 @@ func (s *OrderStorage) CreateOrder(order orderV1.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.orders[order.OrderUUID.String()] = &order
+	s.orders[order.UUID.String()] = &order
 }
 
 func (s *OrderStorage) UpdateOrder(order orderV1.Order) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	s.orders[order.OrderUUID.String()] = &order
+	s.orders[order.UUID.String()] = &order
 }
 
 func (s *OrderStorage) GetOrder(uuid string) *orderV1.Order {
@@ -117,7 +117,7 @@ func (h *OrderHandler) CreateOrder(_ context.Context, req *orderV1.CreateOrderRe
 	}
 
 	order := orderV1.Order{
-		OrderUUID:  uuid.New(),
+		UUID:       uuid.New(),
 		UserUUID:   req.UserUUID,
 		PartUuids:  req.PartUuids,
 		TotalPrice: totalPrice,
@@ -126,7 +126,7 @@ func (h *OrderHandler) CreateOrder(_ context.Context, req *orderV1.CreateOrderRe
 	h.storage.CreateOrder(order)
 
 	return &orderV1.CreateOrderResponse{
-		OrderUUID:  order.OrderUUID,
+		UUID:       order.UUID,
 		TotalPrice: order.TotalPrice,
 	}, nil
 }

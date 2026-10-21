@@ -1,12 +1,12 @@
 type: object
 required:
-  - order_uuid
+  - uuid
   - user_uuid
   - part_uuids
   - total_price
   - status
 properties:
-  order_uuid:
+  uuid:
     type: string
     format: uuid
     description: Unique order identifier

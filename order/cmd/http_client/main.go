@@ -100,14 +100,14 @@ func main() {
 	}
 	log.Printf("created: %+v\n", created)
 
-	paid, err := payOrder(ctx, client, created.OrderUUID, orderV1.PaymentMethodCARD)
+	paid, err := payOrder(ctx, client, created.UUID, orderV1.PaymentMethodCARD)
 	if err != nil {
 		log.Printf("error: %v\n", err)
 		return
 	}
 	log.Printf("paid: %+v\n", paid)
 
-	order, err := getOrder(ctx, client, created.OrderUUID)
+	order, err := getOrder(ctx, client, created.UUID)
 	if err != nil {
 		log.Printf("error: %v\n", err)
 		return

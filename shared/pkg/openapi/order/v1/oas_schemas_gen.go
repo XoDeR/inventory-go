@@ -73,14 +73,14 @@ func (s *CreateOrderRequest) SetPartUuids(val []uuid.UUID) {
 // Ref: #/components/schemas/create_order_response
 type CreateOrderResponse struct {
 	// Unique order identifier.
-	OrderUUID uuid.UUID `json:"order_uuid"`
+	UUID uuid.UUID `json:"uuid"`
 	// Total price.
 	TotalPrice float64 `json:"total_price"`
 }
 
-// GetOrderUUID returns the value of OrderUUID.
-func (s *CreateOrderResponse) GetOrderUUID() uuid.UUID {
-	return s.OrderUUID
+// GetUUID returns the value of UUID.
+func (s *CreateOrderResponse) GetUUID() uuid.UUID {
+	return s.UUID
 }
 
 // GetTotalPrice returns the value of TotalPrice.
@@ -88,9 +88,9 @@ func (s *CreateOrderResponse) GetTotalPrice() float64 {
 	return s.TotalPrice
 }
 
-// SetOrderUUID sets the value of OrderUUID.
-func (s *CreateOrderResponse) SetOrderUUID(val uuid.UUID) {
-	s.OrderUUID = val
+// SetUUID sets the value of UUID.
+func (s *CreateOrderResponse) SetUUID(val uuid.UUID) {
+	s.UUID = val
 }
 
 // SetTotalPrice sets the value of TotalPrice.
@@ -275,7 +275,7 @@ func (o OptNilUUID) Or(d uuid.UUID) uuid.UUID {
 // Ref: #/components/schemas/order
 type Order struct {
 	// Unique order identifier.
-	OrderUUID uuid.UUID `json:"order_uuid"`
+	UUID uuid.UUID `json:"uuid"`
 	// User UUID.
 	UserUUID uuid.UUID `json:"user_uuid"`
 	// List of part UUIDs.
@@ -289,9 +289,9 @@ type Order struct {
 	Status        OrderStatus         `json:"status"`
 }
 
-// GetOrderUUID returns the value of OrderUUID.
-func (s *Order) GetOrderUUID() uuid.UUID {
-	return s.OrderUUID
+// GetUUID returns the value of UUID.
+func (s *Order) GetUUID() uuid.UUID {
+	return s.UUID
 }
 
 // GetUserUUID returns the value of UserUUID.
@@ -324,9 +324,9 @@ func (s *Order) GetStatus() OrderStatus {
 	return s.Status
 }
 
-// SetOrderUUID sets the value of OrderUUID.
-func (s *Order) SetOrderUUID(val uuid.UUID) {
-	s.OrderUUID = val
+// SetUUID sets the value of UUID.
+func (s *Order) SetUUID(val uuid.UUID) {
+	s.UUID = val
 }
 
 // SetUserUUID sets the value of UserUUID.

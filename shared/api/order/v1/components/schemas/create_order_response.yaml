@@ -1,9 +1,9 @@
 type: object
 required:
-  - order_uuid
+  - uuid
   - total_price
 properties:
-  order_uuid:
+  uuid:
     type: string
     format: uuid
     description: Unique order identifier
