@@ -14,7 +14,10 @@ import (
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 
-const serverAddress = "localhost:50051"
+const (
+	serverAddress  = "localhost:50051"
+	requestTimeout = 5 * time.Second
+)
 
 func main() {
 	conn, err := grpc.NewClient(
@@ -33,42 +36,39 @@ func main() {
 
 	client := inventoryV1.NewInventoryServiceClient(conn)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	// List all parts (empty filter)
-	listResp, err := client.ListParts(ctx, &inventoryV1.ListPartsRequest{})
+	parts, err := listParts(ctx, client, nil)
 	if err != nil {
 		log.Printf("failed to list parts: %v\n", err)
 		return
 	}
-	log.Printf("ListParts: %d part(s)\n", len(listResp.GetParts()))
-	for _, part := range listResp.GetParts() {
+	log.Printf("ListParts: %d part(s)\n", len(parts))
+	for _, part := range parts {
 		fmt.Printf("  %s  %s  %s\n", part.GetUuid(), part.GetName(), part.GetCategory())
 	}
 
-	// List parts with a filter: CPU or GPU
-	filteredResp, err := client.ListParts(ctx, &inventoryV1.ListPartsRequest{
-		Filter: &inventoryV1.PartsFilter{
-			Categories: []inventoryV1.Category{
-				inventoryV1.Category_CATEGORY_CPU,
-				inventoryV1.Category_CATEGORY_GPU,
-			},
+	// CPU or GPU
+	filtered, err := listParts(ctx, client, &inventoryV1.PartsFilter{
+		Categories: []inventoryV1.Category{
+			inventoryV1.Category_CATEGORY_CPU,
+			inventoryV1.Category_CATEGORY_GPU,
 		},
 	})
 	if err != nil {
 		log.Printf("failed to list filtered parts: %v\n", err)
 		return
 	}
-	log.Printf("ListParts (CPU/GPU): %d part(s)\n", len(filteredResp.GetParts()))
+	log.Printf("ListParts (CPU/GPU): %d part(s)\n", len(filtered))
 
-	// Get one part: the first listed one, or an unknown UUID to show NotFound
+	// The first listed part, or an unknown UUID to show NotFound
 	uuid := "00000000-0000-0000-0000-000000000000"
-	if len(listResp.GetParts()) > 0 {
-		uuid = listResp.GetParts()[0].GetUuid()
+	if len(parts) > 0 {
+		uuid = parts[0].GetUuid()
 	}
 
-	getResp, err := client.GetPart(ctx, &inventoryV1.GetPartRequest{Uuid: uuid})
+	part, err := getPart(ctx, client, uuid)
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
 			log.Printf("GetPart: part %s not found\n", uuid)
@@ -77,5 +77,23 @@ func main() {
 		log.Printf("failed to get part: %v\n", err)
 		return
 	}
-	log.Printf("GetPart: %v\n", getResp.GetPart())
+	log.Printf("GetPart: %v\n", part)
+}
+
+func listParts(ctx context.Context, client inventoryV1.InventoryServiceClient, filter *inventoryV1.PartsFilter) ([]*inventoryV1.Part, error) {
+	resp, err := client.ListParts(ctx, &inventoryV1.ListPartsRequest{Filter: filter})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.GetParts(), nil
+}
+
+func getPart(ctx context.Context, client inventoryV1.InventoryServiceClient, uuid string) (*inventoryV1.Part, error) {
+	resp, err := client.GetPart(ctx, &inventoryV1.GetPartRequest{Uuid: uuid})
+	if err != nil {
+		return nil, err
+	}
+
+	return resp.GetPart(), nil
 }
