@@ -1,0 +1,2 @@
+// Code gen-ed for inventory-go project services
+// 2026
