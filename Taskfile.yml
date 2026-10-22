@@ -16,7 +16,7 @@ vars:
   OGEN_VERSION: 'v1.24.0'
   YQ_VERSION: 'v4.54.1'
   GRPCURL_VERSION: 'v1.9.4'
-  MOCKERY_VERSION: 'v2.53.3'
+  MOCKERY_VERSION: 'v2.53.8'
 
   MODULES: inventory order payment shared
   BIN_DIR: '{{.ROOT_DIR}}/bin'
@@ -281,6 +281,14 @@ tasks:
         }
     status:
       - test -x {{.MOCKERY}}
+
+  mockery:gen:
+    desc: "Generates mocks for all modules according to .mockery.yaml"
+    deps: [ mockery:install ]
+    cmds:
+      - |
+        echo "🧬 Generating mocks ..."
+        {{.MOCKERY}} --config={{.ROOT_DIR}}/.mockery.yaml
 
   test-api:
     desc: "🧪 Run tests to check the microservices API"
