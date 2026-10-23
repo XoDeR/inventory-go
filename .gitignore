@@ -1,3 +1,4 @@
 bin/
 node_modules/
 openapi_bundled.yaml
+.coverage/

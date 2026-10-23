@@ -19,6 +19,8 @@ vars:
   MOCKERY_VERSION: 'v2.53.8'
 
   MODULES: inventory order payment shared
+  COVERAGE_MODULES: inventory order payment
+  COVERAGE_DIR: '{{.ROOT_DIR}}/.coverage'
   BIN_DIR: '{{.ROOT_DIR}}/bin'
   GOFUMPT: '{{.BIN_DIR}}/gofumpt{{exeExt}}'
   GCI: '{{.BIN_DIR}}/gci{{exeExt}}'
@@ -477,5 +479,50 @@ tasks:
         echo
         echo "🎉 All API tests completed successfully!"
 
+  test-coverage:
+    desc: "Tests with business logic coverage, automatically discovering and analyzing all modules"
+    cmds:
+      - |
+        echo "🧪 Starting coverage calculation..."
+        rm -rf {{.COVERAGE_DIR}}
+        mkdir -p {{.COVERAGE_DIR}}
 
+        # Find all packages to measure coverage for: api and service layers, excluding mocks.
+        # Pure shell instead of grep/tr/tail, so it works without Unix tools on Windows.
+        TARGET_PACKAGES=""
+        TEST_PACKAGES=""
+        for module in {{.COVERAGE_MODULES}}; do
+          TEST_PACKAGES="$TEST_PACKAGES inventory-go/$module/..."
+          for pkg in $(go list inventory-go/$module/internal/...); do
+            case "$pkg" in
+              */mocks*) ;;
+              */api/*|*/service/*) TARGET_PACKAGES="${TARGET_PACKAGES:+$TARGET_PACKAGES,}$pkg" ;;
+            esac
+          done
+        done
 
+        if [ -z "$TARGET_PACKAGES" ]; then
+          echo "⚠️ No packages found for testing"
+          exit 1
+        fi
+
+        echo "🧪 Running tests with coverage collection for all modules..."
+        go test -v -coverprofile={{.COVERAGE_DIR}}/coverage.out -coverpkg=$TARGET_PACKAGES $TEST_PACKAGES
+
+        echo "🧾 Total coverage:"
+        go tool cover -func={{.COVERAGE_DIR}}/coverage.out | { while read -r line; do last="$line"; done; echo "$last"; }
+
+  coverage:html:
+    desc: "Generates an HTML coverage report and opens it in the browser"
+    deps: [ test-coverage ]
+    cmds:
+      - |
+        echo "🌐 Generating HTML report..."
+        go tool cover -html={{.COVERAGE_DIR}}/coverage.out -o {{.COVERAGE_DIR}}/coverage.html
+      - cmd: echo "🚀 Opening {{.COVERAGE_DIR}}/coverage.html"
+      - cmd: cmd /c start "" "{{fromSlash .COVERAGE_DIR}}\coverage.html"
+        platforms: [ windows ]
+      - cmd: open {{.COVERAGE_DIR}}/coverage.html
+        platforms: [ darwin ]
+      - cmd: xdg-open {{.COVERAGE_DIR}}/coverage.html || echo "📂 Report saved to {{.COVERAGE_DIR}}/coverage.html (open it manually)"
+        platforms: [ linux ]
