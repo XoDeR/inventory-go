@@ -479,6 +479,19 @@ tasks:
         echo
         echo "🎉 All API tests completed successfully!"
 
+  test:
+    desc: "Runs unit tests for all modules"
+    cmds:
+      - |
+        ERR=0
+        for mod in {{.MODULES}}; do
+          if [ -d "$mod" ]; then
+            echo "🧪 Testing module $mod"
+            go test -v ./$mod/... || ERR=1
+          fi
+        done
+        exit $ERR
+
   test-coverage:
     desc: "Tests with business logic coverage, automatically discovering and analyzing all modules"
     cmds:

@@ -1,0 +1,114 @@
+version: '3'
+
+# Global project variables.
+# CI reads GO_VERSION, GOLANGCI_LINT_VERSION and MODULES from this block
+# (see .github/scripts/extract-versions.sh), so keep them as plain `NAME: 'value'` lines.
+vars:
+  GO_VERSION: '1.24'
+  GOLANGCI_LINT_VERSION: 'v2.1.5'
+
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  GOLANGCI_LINT: '{{.BIN_DIR}}/golangci-lint'
+
+  COVERAGE_DIR: '{{.ROOT_DIR}}/coverage'
+  COVERAGE_FILE: total.out
+
+  # Space-separated list of Go module directories in the repo root
+  MODULES: service1 service2
+
+tasks:
+  install-golangci-lint:
+    desc: "Installs golangci-lint into the bin directory"
+    cmds:
+      - |
+        [ -f {{.GOLANGCI_LINT}} ] || {
+          mkdir -p {{.BIN_DIR}}
+          echo "📦 Installing golangci-lint {{.GOLANGCI_LINT_VERSION}}..."
+          GOBIN={{.BIN_DIR}} go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@{{.GOLANGCI_LINT_VERSION}}
+        }
+    status:
+      - test -x {{.GOLANGCI_LINT}}
+
+  lint:
+    desc: "Runs golangci-lint for all modules"
+    deps: [ install-golangci-lint ]
+    cmds:
+      - |
+        set -e
+        ERR=0
+        echo "🔍 Linting all modules ..."
+        for mod in {{.MODULES}}; do
+          if [ -d "$mod" ]; then
+            echo "🔍 Linting module $mod"
+            {{.GOLANGCI_LINT}} run $mod/... --config=.golangci.yml || ERR=1
+          fi
+        done
+        exit $ERR
+
+  test:
+    desc: "Runs unit tests for all modules"
+    cmds:
+      - |
+        ERR=0
+        for mod in {{.MODULES}}; do
+          if [ -d "$mod" ]; then
+            echo "🧪 Testing module $mod"
+            go test -v ./$mod/... || ERR=1
+          fi
+        done
+        exit $ERR
+
+  test-coverage:
+    desc: "Tests with business logic (service/repository) coverage, a report per module + a total one"
+    cmds:
+      - |
+        echo "🧪 Starting the coverage calculation..."
+        rm -rf {{.COVERAGE_DIR}}
+        mkdir -p {{.COVERAGE_DIR}}
+
+        ERR=0
+        for mod in {{.MODULES}}; do
+          echo "📦 Processing module: $mod"
+
+          TARGET_PKGS=$(go list ./$mod/... \
+            | grep -E '/(internal/(service|repository))' \
+            | grep -vE '/(mocks|testdata|pkg|api|proto|pb|cmd)' \
+            | paste -sd "," -)
+
+          if [ -z "$TARGET_PKGS" ]; then
+            echo "⚠️  No suitable packages in $mod"
+            continue
+          fi
+
+          go test -coverpkg="$TARGET_PKGS" \
+            -coverprofile={{.COVERAGE_DIR}}/$mod.out \
+            -covermode=atomic \
+            $(echo "$TARGET_PKGS" | tr "," " ") || ERR=1
+        done
+
+        if [ $ERR -ne 0 ]; then
+          echo "❌ Errors during the tests"
+          exit $ERR
+        fi
+
+        echo
+        echo "📊 Coverage per module:"
+        for mod in {{.MODULES}}; do
+          OUTFILE="{{.COVERAGE_DIR}}/$mod.out"
+          if [ -f "$OUTFILE" ]; then
+            printf " • %s: " "$mod"
+            go tool cover -func="$OUTFILE" | tail -n1
+          fi
+        done
+
+        echo
+        echo "📦 Merging all coverage profiles..."
+        {
+          echo "mode: atomic"
+          find {{.COVERAGE_DIR}} -type f -name '*.out' ! -name '{{.COVERAGE_FILE}}' \
+            -exec grep -h -v "^mode:" {} +
+        } > {{.COVERAGE_DIR}}/{{.COVERAGE_FILE}}
+
+        echo
+        echo "🧾 Total coverage across all modules:"
+        go tool cover -func={{.COVERAGE_DIR}}/{{.COVERAGE_FILE}} | tail -n1
