@@ -22,8 +22,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      COVERAGE_DIR: coverage
-      COVERAGE_FILE: total.out
+      COVERAGE_DIR: .coverage
+      COVERAGE_FILE: coverage.out
 
     steps:
       - name: 📥 Checkout code

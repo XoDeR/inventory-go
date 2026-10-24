@@ -46,7 +46,7 @@ func main() {
 	}
 	log.Printf("ListParts: %d part(s)\n", len(parts))
 	for _, part := range parts {
-		fmt.Printf("  %s  %s  %s\n", part.GetUuid(), part.GetName(), part.GetCategory())
+		fmt.Printf("  %s  %s  %s\n", part.GetUuid(), part.GetName(), part.GetCategory()) //nolint:forbidigo // CLI client prints its result to stdout
 	}
 
 	// CPU or GPU
