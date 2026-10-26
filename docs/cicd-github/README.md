@@ -40,7 +40,7 @@ To switch CI off completely, use Actions tab -> CI -> `...` -> Disable workflow.
 The `coverage` job (runs only on `main`) writes the total coverage to a Gist, and a README badge reads it.
 
 1. Create a public Gist containing a file named `coverage.json`.
-2. Create a personal access token with the `gist` scope and save it as the repository secret `GIST_SECRET`.
+2. Create a personal access token with the `gist` scope and save it as the repository secret `CODE_COVERAGE_GIST`.
 3. Save the Gist ID as the repository variable `COVERAGE_GIST_ID` (Settings -> Secrets and variables -> Actions -> Variables).
 4. Add the badge to your README (replace `<user>` and `<gist-id>`):
 

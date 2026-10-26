@@ -57,4 +57,4 @@ jobs:
       # Repository variable holding the ID of the Gist that stores the badge data
       gist-id: ${{ vars.COVERAGE_GIST_ID }}
     secrets:
-      GIST_SECRET: ${{ secrets.GIST_SECRET }}
+      CODE_COVERAGE_GIST: ${{ secrets.CODE_COVERAGE_GIST }}
