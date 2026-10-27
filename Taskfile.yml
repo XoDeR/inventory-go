@@ -539,3 +539,87 @@ tasks:
         platforms: [ darwin ]
       - cmd: xdg-open {{.COVERAGE_DIR}}/coverage.html || echo "📂 Report saved to {{.COVERAGE_DIR}}/coverage.html (open it manually)"
         platforms: [ linux ]
+
+  up-core:
+    desc: "Starts the core containers (shared network)"
+    dir: deploy/compose/core
+    cmds:
+      - echo "[task] 🚀 Starting core containers"
+      - docker compose up --build --detach
+
+  down-core:
+    desc: "Stops and removes the core containers (shared network)"
+    dir: deploy/compose/core
+    cmds:
+      - echo "[task] 🛑 Stopping core containers"
+      - docker compose down --volumes
+
+  up-order:
+    desc: "Starts Order Service dependencies (PostgreSQL)"
+    dir: deploy/compose/order
+    cmds:
+      - echo "[task] 📦 Starting Order Service dependencies"
+      - docker compose up --build --detach
+
+  down-order:
+    desc: "Stops and removes Order Service dependencies (PostgreSQL)"
+    dir: deploy/compose/order
+    cmds:
+      - echo "[task] 🛑 Stopping Order Service dependencies"
+      - docker compose down --volumes
+
+  up-inventory:
+    desc: "Starts Inventory Service dependencies (MongoDB)"
+    dir: deploy/compose/inventory
+    cmds:
+      - echo "[task] 📦 Starting Inventory Service dependencies"
+      - docker compose up --build --detach
+
+  down-inventory:
+    desc: "Stops and removes Inventory Service dependencies (MongoDB)"
+    dir: deploy/compose/inventory
+    cmds:
+      - echo "[task] 🛑 Stopping Inventory Service dependencies"
+      - docker compose down --volumes
+
+  up-all:
+    desc: "Starts all compose parts in order: core, order, inventory"
+    cmds:
+      - task: up-core
+      - task: up-order
+      - task: up-inventory
+
+  down-all:
+    desc: "Stops and removes all compose parts in reverse order (the network goes last)"
+    cmds:
+      - task: down-inventory
+      - task: down-order
+      - task: down-core
+
+  down-core:keep-volumes:
+    desc: "Stops and removes the core containers, keeps volumes"
+    dir: deploy/compose/core
+    cmds:
+      - echo "[task] 🛑 Stopping core containers (volumes are kept)"
+      - docker compose down
+
+  down-order:keep-volumes:
+    desc: "Stops and removes Order Service dependencies, keeps volumes (PostgreSQL data)"
+    dir: deploy/compose/order
+    cmds:
+      - echo "[task] 🛑 Stopping Order Service dependencies (volumes are kept)"
+      - docker compose down
+
+  down-inventory:keep-volumes:
+    desc: "Stops and removes Inventory Service dependencies, keeps volumes (MongoDB data)"
+    dir: deploy/compose/inventory
+    cmds:
+      - echo "[task] 🛑 Stopping Inventory Service dependencies (volumes are kept)"
+      - docker compose down
+
+  down-all:keep-volumes:
+    desc: "Stops and removes all compose parts in reverse order, keeps volumes"
+    cmds:
+      - task: down-inventory:keep-volumes
+      - task: down-order:keep-volumes
+      - task: down-core:keep-volumes

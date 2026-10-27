@@ -1,0 +1,13 @@
+services:
+  placeholder:
+    image: alpine
+    command: ["sh", "-c", "echo 'This is a placeholder service' && sleep infinity"]
+    networks:
+      - microservices-net
+
+networks:
+  microservices-net:
+    # Shared network for all microservices.
+    # Other compose files join it with `external: true`.
+    name: microservices-net
+    external: false
