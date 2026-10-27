@@ -1,10 +1,15 @@
 package part
 
 import (
+	"context"
+	"fmt"
+	"os"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/suite"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 
 	repoModel "inventory-go/inventory/internal/repository/model"
 )
@@ -14,23 +19,53 @@ const (
 	cpuUuid     = "uuid-cpu"
 	ramUuid     = "uuid-ram"
 	noManufUuid = "uuid-no-manufacturer"
+
+	// mongoURIEnv holds the connection string of a MongoDB used by these integration tests,
+	// e.g. mongodb://inventory-service-user:inventory-service-password@localhost:27017/?authSource=admin.
+	// Start one with `task up-core up-inventory`. The tests are skipped when it is not set.
+	mongoURIEnv = "MONGO_TEST_URI"
 )
 
 type RepositorySuite struct {
 	suite.Suite
 
+	client     *mongo.Client
+	db         *mongo.Database
 	repository *repository
 }
 
-// SetupTest runs before every test, so each test gets a fresh repository with a known
-// set of parts instead of the production seed, and no state leaks between tests.
-func (s *RepositorySuite) SetupTest() {
-	s.repository = NewRepository()
-	s.repository.data = make(map[string]repoModel.Part)
-
-	for _, part := range testParts() {
-		s.repository.data[part.Uuid] = part
+func (s *RepositorySuite) SetupSuite() {
+	uri := os.Getenv(mongoURIEnv)
+	if uri == "" {
+		s.T().Skipf("%s is not set, skipping MongoDB repository tests", mongoURIEnv)
 	}
+
+	client, err := mongo.Connect(options.Client().ApplyURI(uri))
+	s.Require().NoError(err)
+
+	s.client = client
+}
+
+func (s *RepositorySuite) TearDownSuite() {
+	if s.client != nil {
+		s.Require().NoError(s.client.Disconnect(context.Background()))
+	}
+}
+
+// SetupTest runs before every test: each test gets its own empty database filled with a known
+// set of parts instead of the production seed, so no state leaks between tests.
+func (s *RepositorySuite) SetupTest() {
+	ctx := context.Background()
+
+	s.db = s.client.Database(fmt.Sprintf("inventory-test-%d", time.Now().UnixNano()))
+	s.repository = NewRepository(s.db)
+
+	_, err := s.repository.collection.InsertMany(ctx, testParts())
+	s.Require().NoError(err)
+}
+
+func (s *RepositorySuite) TearDownTest() {
+	s.Require().NoError(s.db.Drop(context.Background()))
 }
 
 func testParts() []repoModel.Part {

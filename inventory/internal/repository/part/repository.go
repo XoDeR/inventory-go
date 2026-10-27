@@ -1,37 +1,47 @@
 package part
 
 import (
-	"sync"
+	"context"
 	"time"
+
+	"go.mongodb.org/mongo-driver/v2/mongo"
 
 	def "inventory-go/inventory/internal/repository"
 	repoModel "inventory-go/inventory/internal/repository/model"
 )
 
+const collectionName = "parts"
+
 var _ def.InventoryRepository = (*repository)(nil)
 
 type repository struct {
-	mu   sync.RWMutex
-	data map[string]repoModel.Part
+	collection *mongo.Collection
 }
 
-// NewRepository returns an in-memory repository filled with the initial
-// catalog. The service has no create RPC, so without it the inventory would
-// always be empty.
-func NewRepository() *repository {
-	r := &repository{
-		data: make(map[string]repoModel.Part),
+func NewRepository(db *mongo.Database) *repository {
+	return &repository{
+		collection: db.Collection(collectionName),
+	}
+}
+
+// Seed fills an empty collection with the initial catalog. The service has no create RPC,
+// so without it the inventory would always be empty. A non-empty collection is left untouched.
+func (r *repository) Seed(ctx context.Context) error {
+	count, err := r.collection.CountDocuments(ctx, struct{}{})
+	if err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
 	}
 
-	for _, part := range seedParts() {
-		r.data[part.Uuid] = part
-	}
+	_, err = r.collection.InsertMany(ctx, seedParts())
 
-	return r
+	return err
 }
 
 func seedParts() []repoModel.Part {
-	now := time.Now()
+	now := time.Now().UTC()
 
 	return []repoModel.Part{
 		{

@@ -54,27 +54,26 @@ func (s *RepositorySuite) TestGetNotFound() {
 	s.Require().Equal(model.Part{}, part)
 }
 
-func (s *RepositorySuite) TestGetReturnsCopyOfNestedStructs() {
+func (s *RepositorySuite) TestSeedFillsEmptyCollectionOnce() {
 	ctx := context.Background()
+	s.Require().NoError(s.repository.collection.Drop(ctx))
 
-	part, err := s.repository.Get(ctx, gpuUuid)
+	s.Require().NoError(s.repository.Seed(ctx))
+	s.Require().NoError(s.repository.Seed(ctx))
+
+	parts, err := s.repository.List(ctx, model.PartsFilter{})
+
 	s.Require().NoError(err)
-
-	// Mutating the returned nested structs must not change what is stored.
-	part.Dimensions.Length = 999
-	part.Manufacturer.Name = "changed"
-
-	stored, err := s.repository.Get(ctx, gpuUuid)
-	s.Require().NoError(err)
-	s.Require().Equal(float64(30), stored.Dimensions.Length)
-	s.Require().Equal("NVIDIA", stored.Manufacturer.Name)
+	s.Require().Len(parts, len(seedParts()))
 }
 
-func (s *RepositorySuite) TestNewRepositoryIsSeeded() {
-	repo := NewRepository()
+func (s *RepositorySuite) TestSeedKeepsExistingData() {
+	ctx := context.Background()
 
-	parts, err := repo.List(context.Background(), model.PartsFilter{})
+	s.Require().NoError(s.repository.Seed(ctx))
+
+	parts, err := s.repository.List(ctx, model.PartsFilter{})
 
 	s.Require().NoError(err)
-	s.Require().NotEmpty(parts)
+	s.Require().Len(parts, len(testParts()))
 }

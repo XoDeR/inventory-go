@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -28,9 +30,44 @@ import (
 const (
 	grpcPort = 50051
 	httpPort = 8081
+
+	defaultMongoURI = "mongodb://inventory-service-user:inventory-service-password@localhost:27017/?authSource=admin"
+	databaseName    = "inventory-service"
 )
 
 func main() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	mongoURI := os.Getenv("MONGO_URI")
+	if mongoURI == "" {
+		mongoURI = defaultMongoURI
+	}
+
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	if err != nil {
+		log.Printf("failed to connect to database: %v\n", err)
+		return
+	}
+	defer func() {
+		if cerr := mongoClient.Disconnect(context.Background()); cerr != nil {
+			log.Printf("failed to disconnect from database: %v\n", cerr)
+		}
+	}()
+
+	pingCtx, pingCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer pingCancel()
+	if err = mongoClient.Ping(pingCtx, nil); err != nil {
+		log.Printf("database is unavailable: %v\n", err)
+		return
+	}
+
+	repo := inventoryRepository.NewRepository(mongoClient.Database(databaseName))
+	if err = repo.Seed(ctx); err != nil {
+		log.Printf("failed to seed the inventory: %v\n", err)
+		return
+	}
+
 	// listener
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
 	if err != nil {
@@ -45,7 +82,6 @@ func main() {
 
 	s := grpc.NewServer(grpc.UnaryInterceptor(interceptor.UnaryValidate()))
 
-	repo := inventoryRepository.NewRepository()
 	service := inventoryService.NewService(repo)
 	api := inventoryV1API.NewAPI(service)
 
@@ -63,9 +99,6 @@ func main() {
 	}()
 
 	// HTTP gateway (REST -> gRPC) + Swagger UI
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
 	gwMux := runtime.NewServeMux()
 	err = inventoryV1.RegisterInventoryServiceHandlerFromEndpoint(
 		ctx,
