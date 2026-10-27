@@ -13,14 +13,18 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/jackc/pgx/v5/stdlib"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
 	orderV1API "inventory-go/order/internal/api/order/v1"
 	inventoryClientV1 "inventory-go/order/internal/client/grpc/inventory/v1"
 	paymentClientV1 "inventory-go/order/internal/client/grpc/payment/v1"
+	"inventory-go/order/internal/migrator"
 	orderRepository "inventory-go/order/internal/repository/order"
 	orderService "inventory-go/order/internal/service/order"
+	"inventory-go/order/migrations"
 	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
@@ -30,12 +34,44 @@ const (
 	inventoryServerAddress = "localhost:50051"
 	paymentServerAddress   = "localhost:50052"
 
+	defaultDBURI = "postgres://order-service-user:order-service-password@localhost:5432/order-service"
+
 	httpPort          = "8080"
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 10 * time.Second
 )
 
 func main() {
+	ctx := context.Background()
+
+	dbURI := os.Getenv("DB_URI")
+	if dbURI == "" {
+		dbURI = defaultDBURI
+	}
+
+	pool, err := pgxpool.New(ctx, dbURI)
+	if err != nil {
+		log.Printf("failed to connect to database: %v\n", err)
+		return
+	}
+	defer pool.Close()
+
+	if err = pool.Ping(ctx); err != nil {
+		log.Printf("database is unavailable: %v\n", err)
+		return
+	}
+
+	// goose works on top of database/sql, so run migrations through a stdlib wrapper of the pool
+	migrationsDB := stdlib.OpenDBFromPool(pool)
+	err = migrator.NewMigrator(migrationsDB).Up(ctx, migrations.FS)
+	if err != nil {
+		log.Printf("failed to run migrations: %v\n", err)
+		return
+	}
+	if err = migrationsDB.Close(); err != nil {
+		log.Printf("failed to close migrations connection: %v\n", err)
+	}
+
 	inventoryConn, err := grpc.NewClient(
 		inventoryServerAddress,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -67,7 +103,7 @@ func main() {
 	inventoryClient := inventoryClientV1.NewClient(inventoryV1.NewInventoryServiceClient(inventoryConn))
 	paymentClient := paymentClientV1.NewClient(paymentV1.NewPaymentServiceClient(paymentConn))
 
-	repo := orderRepository.NewRepository()
+	repo := orderRepository.NewRepository(pool)
 	service := orderService.NewService(repo, inventoryClient, paymentClient)
 	api := orderV1API.NewAPI(service)
 
@@ -110,7 +146,7 @@ func main() {
 
 	log.Println("Server shutdown...")
 
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	ctx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 	defer cancel()
 
 	err = server.Shutdown(ctx)

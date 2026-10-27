@@ -1,14 +1,32 @@
-# Handle line endings automatically for text files
-* text=auto
+# Normalize line endings: text files are stored in the repository and checked out with LF,
+# regardless of the platform or the user's core.autocrlf setting
+* text=auto eol=lf
 
-# Force Go files to always use LF line endings
+# Go
 *.go text eol=lf
 go.mod text eol=lf
 go.sum text eol=lf
+go.work text eol=lf
+go.work.sum text eol=lf
 
-# Explicitly ensure shell scripts use LF
+# Config, migrations, docs
+*.sql text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.proto text eol=lf
+
+# Shell scripts must use LF
 *.sh text eol=lf
 
 # Windows batch files must retain CRLF to prevent execution errors
 *.bat text eol=crlf
 *.cmd text eol=crlf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary

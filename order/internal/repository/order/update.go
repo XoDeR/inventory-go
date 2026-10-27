@@ -3,20 +3,38 @@ package order
 import (
 	"context"
 
+	sq "github.com/Masterminds/squirrel"
+
 	"inventory-go/order/internal/model"
 	repoConverter "inventory-go/order/internal/repository/converter"
 )
 
-func (r *repository) Update(_ context.Context, order model.Order) error {
-	r.mu.Lock()
-	defer r.mu.Unlock()
+func (r *repository) Update(ctx context.Context, order model.Order) error {
+	o := repoConverter.OrderToRepoModel(order)
 
-	key := order.Uuid.String()
-	if _, ok := r.data[key]; !ok {
-		return model.ErrOrderNotFound
+	query, args, err := sq.Update(tableName).
+		PlaceholderFormat(sq.Dollar).
+		Set(columnUserUuid, o.UserUuid).
+		Set(columnPartUuids, o.PartUuids).
+		Set(columnTotalPrice, o.TotalPrice).
+		Set(columnTransactionUuid, o.TransactionUuid).
+		Set(columnPaymentMethod, o.PaymentMethod).
+		Set(columnStatus, o.Status).
+		Set(columnUpdatedAt, sq.Expr("now()")).
+		Where(sq.Eq{columnUuid: o.Uuid}).
+		ToSql()
+	if err != nil {
+		return err
 	}
 
-	r.data[key] = repoConverter.OrderToRepoModel(order)
+	res, err := r.pool.Exec(ctx, query, args...)
+	if err != nil {
+		return err
+	}
+
+	if res.RowsAffected() == 0 {
+		return model.ErrOrderNotFound
+	}
 
 	return nil
 }
