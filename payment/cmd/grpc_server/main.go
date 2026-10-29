@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -21,6 +21,7 @@ import (
 	paymentService "inventory-go/payment/internal/service/payment"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
+	"inventory-go/shared/pkg/logger"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
 
@@ -29,19 +30,25 @@ const configPath = "./deploy/compose/payment/.env"
 func main() {
 	err := config.Load(configPath)
 	if err != nil {
-		log.Printf("failed to load config: %v\n", err)
+		slog.Error("failed to load config", "error", err)
+		return
+	}
+
+	err = logger.Init(config.AppConfig().Logger.Level(), config.AppConfig().Logger.AsJSON())
+	if err != nil {
+		slog.Error("failed to init logger", "error", err)
 		return
 	}
 
 	// listener
 	lis, err := net.Listen("tcp", config.AppConfig().GRPC.Address())
 	if err != nil {
-		log.Printf("failed to listen: %v\n", err)
+		slog.Error("failed to listen", "error", err)
 		return
 	}
 	defer func() {
 		if cerr := lis.Close(); cerr != nil {
-			log.Printf("failed to close listener: %v\n", cerr)
+			slog.Error("failed to close listener", "error", cerr)
 		}
 	}()
 
@@ -55,10 +62,10 @@ func main() {
 	reflection.Register(s)
 
 	go func() {
-		log.Printf("gRPC server listening on %s\n", config.AppConfig().GRPC.Address())
+		slog.Info("gRPC server listening", "address", config.AppConfig().GRPC.Address())
 		err = s.Serve(lis)
 		if err != nil {
-			log.Printf("failed to serve: %v\n", err)
+			slog.Error("failed to serve", "error", err)
 			return
 		}
 	}()
@@ -75,7 +82,7 @@ func main() {
 		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 	)
 	if err != nil {
-		log.Printf("failed to register gateway: %v\n", err)
+		slog.Error("failed to register gateway", "error", err)
 		return
 	}
 
@@ -90,9 +97,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("HTTP gateway listening on %s (Swagger UI: /swagger-ui.html)\n", config.AppConfig().HTTP.Address())
+		slog.Info("HTTP gateway listening", "address", config.AppConfig().HTTP.Address(), "swagger_ui", "/swagger-ui.html")
 		if serr := gwServer.ListenAndServe(); serr != nil && !errors.Is(serr, http.ErrServerClosed) {
-			log.Printf("failed to serve HTTP: %v\n", serr)
+			slog.Error("failed to serve HTTP", "error", serr)
 		}
 	}()
 
@@ -100,14 +107,14 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down servers...")
+	slog.Info("shutting down servers")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 	if err := gwServer.Shutdown(shutdownCtx); err != nil {
-		log.Printf("HTTP server shutdown error: %v\n", err)
+		slog.Error("HTTP server shutdown error", "error", err)
 	}
 
 	s.GracefulStop()
-	log.Println("Server stopped")
+	slog.Info("server stopped")
 }

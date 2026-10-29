@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -25,6 +25,7 @@ import (
 	orderRepository "inventory-go/order/internal/repository/order"
 	orderService "inventory-go/order/internal/service/order"
 	"inventory-go/order/migrations"
+	"inventory-go/shared/pkg/logger"
 	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
@@ -42,19 +43,25 @@ func main() {
 
 	err := config.Load(configPath)
 	if err != nil {
-		log.Printf("failed to load config: %v\n", err)
+		slog.Error("failed to load config", "error", err)
+		return
+	}
+
+	err = logger.Init(config.AppConfig().Logger.Level(), config.AppConfig().Logger.AsJSON())
+	if err != nil {
+		slog.Error("failed to init logger", "error", err)
 		return
 	}
 
 	pool, err := pgxpool.New(ctx, config.AppConfig().Postgres.URI())
 	if err != nil {
-		log.Printf("failed to connect to database: %v\n", err)
+		slog.Error("failed to connect to database", "error", err)
 		return
 	}
 	defer pool.Close()
 
 	if err = pool.Ping(ctx); err != nil {
-		log.Printf("database is unavailable: %v\n", err)
+		slog.Error("database is unavailable", "error", err)
 		return
 	}
 
@@ -62,11 +69,11 @@ func main() {
 	migrationsDB := stdlib.OpenDBFromPool(pool)
 	err = migrator.NewMigrator(migrationsDB).Up(ctx, migrations.FS)
 	if err != nil {
-		log.Printf("failed to run migrations: %v\n", err)
+		slog.Error("failed to run migrations", "error", err)
 		return
 	}
 	if err = migrationsDB.Close(); err != nil {
-		log.Printf("failed to close migrations connection: %v\n", err)
+		slog.Error("failed to close migrations connection", "error", err)
 	}
 
 	inventoryConn, err := grpc.NewClient(
@@ -74,12 +81,12 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Printf("failed to connect to inventory: %v\n", err)
+		slog.Error("failed to connect to inventory", "error", err)
 		return
 	}
 	defer func() {
 		if cerr := inventoryConn.Close(); cerr != nil {
-			log.Printf("failed to close inventory connection: %v\n", cerr)
+			slog.Error("failed to close inventory connection", "error", cerr)
 		}
 	}()
 
@@ -88,12 +95,12 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Printf("failed to connect to payment: %v\n", err)
+		slog.Error("failed to connect to payment", "error", err)
 		return
 	}
 	defer func() {
 		if cerr := paymentConn.Close(); cerr != nil {
-			log.Printf("failed to close payment connection: %v\n", cerr)
+			slog.Error("failed to close payment connection", "error", cerr)
 		}
 	}()
 
@@ -106,7 +113,7 @@ func main() {
 
 	orderServer, err := orderV1.NewServer(api)
 	if err != nil {
-		log.Printf("error creating OpenApi server: %v\n", err)
+		slog.Error("error creating OpenApi server", "error", err)
 		return
 	}
 
@@ -129,10 +136,10 @@ func main() {
 
 	// launch server in go routine
 	go func() {
-		log.Printf("HTTP server running on %s\n", config.AppConfig().HTTP.Address())
+		slog.Info("HTTP server running", "address", config.AppConfig().HTTP.Address())
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
-			log.Printf("Error launching server: %v\n", err)
+			slog.Error("Error launching server", "error", err)
 		}
 	}()
 
@@ -141,15 +148,15 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Server shutdown...")
+	slog.Info("shutting down server")
 
 	ctx, cancel := context.WithTimeout(ctx, shutdownTimeout)
 	defer cancel()
 
 	err = server.Shutdown(ctx)
 	if err != nil {
-		log.Printf("Server shutdown error: %v\n", err)
+		slog.Error("Server shutdown error", "error", err)
 	}
 
-	log.Println("Server stopped.")
+	slog.Info("server stopped")
 }

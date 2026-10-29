@@ -3,7 +3,7 @@ package payment
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/google/uuid"
 
@@ -24,8 +24,12 @@ func (s *service) PayOrder(_ context.Context, info model.PayOrderInfo) (string, 
 	}
 
 	transactionUUID := uuid.NewString()
-	log.Printf("Payment successful, order_uuid: %s, user_uuid: %s, method: %d, transaction_uuid: %s\n",
-		info.OrderUuid, info.UserUuid, info.PaymentMethod, transactionUUID)
+	slog.Info("payment successful",
+		"order_uuid", info.OrderUuid,
+		"user_uuid", info.UserUuid,
+		"method", info.PaymentMethod,
+		"transaction_uuid", transactionUUID,
+	)
 
 	return transactionUUID, nil
 }

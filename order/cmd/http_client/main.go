@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -93,32 +93,32 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
 
-	log.Println("Testing order API")
+	slog.Info("testing order API")
 
 	client, err := orderV1.NewClient(serverURL)
 	if err != nil {
-		log.Printf("error creating client: %v\n", err)
+		slog.Error("error creating client", "error", err)
 		return
 	}
 
 	created, err := createOrder(ctx, client, generateRandomOrderRequest())
 	if err != nil {
-		log.Printf("error: %v\n", err)
+		slog.Error("failed to create order", "error", err)
 		return
 	}
-	log.Printf("created: %+v\n", created)
+	slog.Info("order created", "order", created)
 
 	paid, err := payOrder(ctx, client, created.UUID, orderV1.PaymentMethodCARD)
 	if err != nil {
-		log.Printf("error: %v\n", err)
+		slog.Error("failed to pay order", "error", err)
 		return
 	}
-	log.Printf("paid: %+v\n", paid)
+	slog.Info("order paid", "response", paid)
 
 	order, err := getOrder(ctx, client, created.UUID)
 	if err != nil {
-		log.Printf("error: %v\n", err)
+		slog.Error("failed to get order", "error", err)
 		return
 	}
-	log.Printf("fetched: %+v\n", order)
+	slog.Info("order fetched", "order", order)
 }

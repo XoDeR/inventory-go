@@ -11,6 +11,7 @@ import (
 var appConfig *config
 
 type config struct {
+	Logger    LoggerConfig
 	HTTP      OrderHTTPConfig
 	Inventory InventoryClientConfig
 	Payment   PaymentClientConfig
@@ -45,7 +46,13 @@ func Load(path ...string) error {
 		return err
 	}
 
+	loggerCfg, err := env.NewLoggerConfig()
+	if err != nil {
+		return err
+	}
+
 	appConfig = &config{
+		Logger:    loggerCfg,
 		HTTP:      httpCfg,
 		Inventory: inventoryCfg,
 		Payment:   paymentCfg,

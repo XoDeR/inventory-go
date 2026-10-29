@@ -576,7 +576,9 @@ tasks:
 
         # Pass the list of services as a comma-separated string
         export SERVICES="{{.SERVICES}}"
-        ENV_SUBST={{.ENVSUBST}} bash "$SCRIPT"
+        # Source the script into Task's built-in shell: no external bash is needed (on Windows "bash" may be WSL)
+        export ENV_SUBST="{{.ENVSUBST}}" SCRIPT_DIR="{{.ENVDIR}}"
+        . "$SCRIPT"
 
   up-core:
     desc: "Starts the core containers (shared network)"

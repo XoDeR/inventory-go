@@ -11,8 +11,9 @@ import (
 var appConfig *config
 
 type config struct {
-	GRPC PaymentGRPCConfig
-	HTTP PaymentHTTPConfig
+	Logger LoggerConfig
+	GRPC   PaymentGRPCConfig
+	HTTP   PaymentHTTPConfig
 }
 
 // Load reads the given .env files (a missing file is not an error, the process
@@ -33,9 +34,15 @@ func Load(path ...string) error {
 		return err
 	}
 
+	loggerCfg, err := env.NewLoggerConfig()
+	if err != nil {
+		return err
+	}
+
 	appConfig = &config{
-		GRPC: grpcCfg,
-		HTTP: httpCfg,
+		Logger: loggerCfg,
+		GRPC:   grpcCfg,
+		HTTP:   httpCfg,
 	}
 
 	return nil

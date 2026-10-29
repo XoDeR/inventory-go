@@ -11,9 +11,10 @@ import (
 var appConfig *config
 
 type config struct {
-	GRPC  InventoryGRPCConfig
-	HTTP  InventoryHTTPConfig
-	Mongo MongoConfig
+	Logger LoggerConfig
+	GRPC   InventoryGRPCConfig
+	HTTP   InventoryHTTPConfig
+	Mongo  MongoConfig
 }
 
 // Load reads the given .env files (a missing file is not an error, the process
@@ -39,10 +40,16 @@ func Load(path ...string) error {
 		return err
 	}
 
+	loggerCfg, err := env.NewLoggerConfig()
+	if err != nil {
+		return err
+	}
+
 	appConfig = &config{
-		GRPC:  grpcCfg,
-		HTTP:  httpCfg,
-		Mongo: mongoCfg,
+		Logger: loggerCfg,
+		GRPC:   grpcCfg,
+		HTTP:   httpCfg,
+		Mongo:  mongoCfg,
 	}
 
 	return nil

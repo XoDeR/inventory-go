@@ -2,7 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,12 +20,12 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Printf("failed to connect: %v\n", err)
+		slog.Error("failed to connect", "error", err)
 		return
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			log.Printf("failed to close connection: %v\n", cerr)
+			slog.Error("failed to close connection", "error", cerr)
 		}
 	}()
 
@@ -40,9 +40,9 @@ func main() {
 		PaymentMethod: paymentV1.PaymentMethod_PAYMENT_METHOD_CARD,
 	})
 	if err != nil {
-		log.Printf("failed to pay order: %v\n", err)
+		slog.Error("failed to pay order", "error", err)
 		return
 	}
 
-	log.Printf("PayOrder: transaction_uuid: %s\n", resp.GetTransactionUuid())
+	slog.Info("PayOrder", "transaction_uuid", resp.GetTransactionUuid())
 }

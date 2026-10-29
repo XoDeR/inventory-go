@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"time"
 
 	"google.golang.org/grpc"
@@ -25,12 +25,12 @@ func main() {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
-		log.Printf("failed to connect: %v\n", err)
+		slog.Error("failed to connect", "error", err)
 		return
 	}
 	defer func() {
 		if cerr := conn.Close(); cerr != nil {
-			log.Printf("failed to close connection: %v\n", cerr)
+			slog.Error("failed to close connection", "error", cerr)
 		}
 	}()
 
@@ -41,10 +41,10 @@ func main() {
 
 	parts, err := listParts(ctx, client, nil)
 	if err != nil {
-		log.Printf("failed to list parts: %v\n", err)
+		slog.Error("failed to list parts", "error", err)
 		return
 	}
-	log.Printf("ListParts: %d part(s)\n", len(parts))
+	slog.Info("ListParts", "parts", len(parts))
 	for _, part := range parts {
 		fmt.Printf("  %s  %s  %s\n", part.GetUuid(), part.GetName(), part.GetCategory()) //nolint:forbidigo // CLI client prints its result to stdout
 	}
@@ -57,10 +57,10 @@ func main() {
 		},
 	})
 	if err != nil {
-		log.Printf("failed to list filtered parts: %v\n", err)
+		slog.Error("failed to list filtered parts", "error", err)
 		return
 	}
-	log.Printf("ListParts (CPU/GPU): %d part(s)\n", len(filtered))
+	slog.Info("ListParts (CPU/GPU)", "parts", len(filtered))
 
 	// The first listed part, or an unknown UUID to show NotFound
 	uuid := "00000000-0000-0000-0000-000000000000"
@@ -71,13 +71,13 @@ func main() {
 	part, err := getPart(ctx, client, uuid)
 	if err != nil {
 		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
-			log.Printf("GetPart: part %s not found\n", uuid)
+			slog.Warn("GetPart: part not found", "uuid", uuid)
 			return
 		}
-		log.Printf("failed to get part: %v\n", err)
+		slog.Error("failed to get part", "error", err)
 		return
 	}
-	log.Printf("GetPart: %v\n", part)
+	slog.Info("GetPart", "part", part)
 }
 
 func listParts(ctx context.Context, client inventoryV1.InventoryServiceClient, filter *inventoryV1.PartsFilter) ([]*inventoryV1.Part, error) {
