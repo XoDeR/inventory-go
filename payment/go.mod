@@ -3,8 +3,10 @@ module inventory-go/payment
 go 1.27.2
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/google/uuid v1.6.0
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
 	inventory-go/shared v0.0.0

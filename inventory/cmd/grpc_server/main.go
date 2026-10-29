@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -20,6 +19,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	inventoryV1API "inventory-go/inventory/internal/api/inventory/v1"
+	"inventory-go/inventory/internal/config"
 	inventoryRepository "inventory-go/inventory/internal/repository/part"
 	inventoryService "inventory-go/inventory/internal/service/part"
 	"inventory-go/shared/api/swagger"
@@ -27,24 +27,19 @@ import (
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 
-const (
-	grpcPort = 50051
-	httpPort = 8081
-
-	defaultMongoURI = "mongodb://inventory-service-user:inventory-service-password@localhost:27017/?authSource=admin"
-	databaseName    = "inventory-service"
-)
+const configPath = "./deploy/compose/inventory/.env"
 
 func main() {
+	err := config.Load(configPath)
+	if err != nil {
+		log.Printf("failed to load config: %v\n", err)
+		return
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	mongoURI := os.Getenv("MONGO_URI")
-	if mongoURI == "" {
-		mongoURI = defaultMongoURI
-	}
-
-	mongoClient, err := mongo.Connect(options.Client().ApplyURI(mongoURI))
+	mongoClient, err := mongo.Connect(options.Client().ApplyURI(config.AppConfig().Mongo.URI()))
 	if err != nil {
 		log.Printf("failed to connect to database: %v\n", err)
 		return
@@ -62,14 +57,14 @@ func main() {
 		return
 	}
 
-	repo := inventoryRepository.NewRepository(mongoClient.Database(databaseName))
+	repo := inventoryRepository.NewRepository(mongoClient.Database(config.AppConfig().Mongo.DatabaseName()))
 	if err = repo.Seed(ctx); err != nil {
 		log.Printf("failed to seed the inventory: %v\n", err)
 		return
 	}
 
 	// listener
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	lis, err := net.Listen("tcp", config.AppConfig().GRPC.Address())
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -90,7 +85,7 @@ func main() {
 	reflection.Register(s)
 
 	go func() {
-		log.Printf("gRPC server listening on %d\n", grpcPort)
+		log.Printf("gRPC server listening on %s\n", config.AppConfig().GRPC.Address())
 		err = s.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)
@@ -103,7 +98,7 @@ func main() {
 	err = inventoryV1.RegisterInventoryServiceHandlerFromEndpoint(
 		ctx,
 		gwMux,
-		fmt.Sprintf("localhost:%d", grpcPort),
+		config.AppConfig().GRPC.Address(),
 		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 	)
 	if err != nil {
@@ -116,13 +111,13 @@ func main() {
 	httpMux.Handle("/", swagger.Handler("inventory/v1/inventory.swagger.json"))
 
 	gwServer := &http.Server{
-		Addr:              fmt.Sprintf(":%d", httpPort),
+		Addr:              config.AppConfig().HTTP.Address(),
 		Handler:           httpMux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		log.Printf("HTTP gateway listening on %d (Swagger UI: /swagger-ui.html)\n", httpPort)
+		log.Printf("HTTP gateway listening on %s (Swagger UI: /swagger-ui.html)\n", config.AppConfig().HTTP.Address())
 		if serr := gwServer.ListenAndServe(); serr != nil && !errors.Is(serr, http.ErrServerClosed) {
 			log.Printf("failed to serve HTTP: %v\n", serr)
 		}

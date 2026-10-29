@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"log"
-	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -21,6 +20,7 @@ import (
 	orderV1API "inventory-go/order/internal/api/order/v1"
 	inventoryClientV1 "inventory-go/order/internal/client/grpc/inventory/v1"
 	paymentClientV1 "inventory-go/order/internal/client/grpc/payment/v1"
+	"inventory-go/order/internal/config"
 	"inventory-go/order/internal/migrator"
 	orderRepository "inventory-go/order/internal/repository/order"
 	orderService "inventory-go/order/internal/service/order"
@@ -31,12 +31,8 @@ import (
 )
 
 const (
-	inventoryServerAddress = "localhost:50051"
-	paymentServerAddress   = "localhost:50052"
+	configPath = "./deploy/compose/order/.env"
 
-	defaultDBURI = "postgres://order-service-user:order-service-password@localhost:5432/order-service"
-
-	httpPort          = "8080"
 	readHeaderTimeout = 5 * time.Second
 	shutdownTimeout   = 10 * time.Second
 )
@@ -44,12 +40,13 @@ const (
 func main() {
 	ctx := context.Background()
 
-	dbURI := os.Getenv("DB_URI")
-	if dbURI == "" {
-		dbURI = defaultDBURI
+	err := config.Load(configPath)
+	if err != nil {
+		log.Printf("failed to load config: %v\n", err)
+		return
 	}
 
-	pool, err := pgxpool.New(ctx, dbURI)
+	pool, err := pgxpool.New(ctx, config.AppConfig().Postgres.URI())
 	if err != nil {
 		log.Printf("failed to connect to database: %v\n", err)
 		return
@@ -73,7 +70,7 @@ func main() {
 	}
 
 	inventoryConn, err := grpc.NewClient(
-		inventoryServerAddress,
+		config.AppConfig().Inventory.Address(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -87,7 +84,7 @@ func main() {
 	}()
 
 	paymentConn, err := grpc.NewClient(
-		paymentServerAddress,
+		config.AppConfig().Payment.Address(),
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {
@@ -125,14 +122,14 @@ func main() {
 
 	// create server
 	server := &http.Server{
-		Addr:              net.JoinHostPort("localhost", httpPort),
+		Addr:              config.AppConfig().HTTP.Address(),
 		Handler:           r,
 		ReadHeaderTimeout: readHeaderTimeout,
 	}
 
 	// launch server in go routine
 	go func() {
-		log.Printf("HTTP server running on port %s\n", httpPort)
+		log.Printf("HTTP server running on %s\n", config.AppConfig().HTTP.Address())
 		err := server.ListenAndServe()
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			log.Printf("Error launching server: %v\n", err)

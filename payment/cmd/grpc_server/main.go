@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -18,20 +17,24 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	paymentV1API "inventory-go/payment/internal/api/payment/v1"
+	"inventory-go/payment/internal/config"
 	paymentService "inventory-go/payment/internal/service/payment"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
 
-const (
-	grpcPort = 50052
-	httpPort = 8082
-)
+const configPath = "./deploy/compose/payment/.env"
 
 func main() {
+	err := config.Load(configPath)
+	if err != nil {
+		log.Printf("failed to load config: %v\n", err)
+		return
+	}
+
 	// listener
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	lis, err := net.Listen("tcp", config.AppConfig().GRPC.Address())
 	if err != nil {
 		log.Printf("failed to listen: %v\n", err)
 		return
@@ -52,7 +55,7 @@ func main() {
 	reflection.Register(s)
 
 	go func() {
-		log.Printf("gRPC server listening on %d\n", grpcPort)
+		log.Printf("gRPC server listening on %s\n", config.AppConfig().GRPC.Address())
 		err = s.Serve(lis)
 		if err != nil {
 			log.Printf("failed to serve: %v\n", err)
@@ -68,7 +71,7 @@ func main() {
 	err = paymentV1.RegisterPaymentServiceHandlerFromEndpoint(
 		ctx,
 		gwMux,
-		fmt.Sprintf("localhost:%d", grpcPort),
+		config.AppConfig().GRPC.Address(),
 		[]grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())},
 	)
 	if err != nil {
@@ -81,13 +84,13 @@ func main() {
 	httpMux.Handle("/", swagger.Handler("payment/v1/payment.swagger.json"))
 
 	gwServer := &http.Server{
-		Addr:              fmt.Sprintf(":%d", httpPort),
+		Addr:              config.AppConfig().HTTP.Address(),
 		Handler:           httpMux,
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
 	go func() {
-		log.Printf("HTTP gateway listening on %d (Swagger UI: /swagger-ui.html)\n", httpPort)
+		log.Printf("HTTP gateway listening on %s (Swagger UI: /swagger-ui.html)\n", config.AppConfig().HTTP.Address())
 		if serr := gwServer.ListenAndServe(); serr != nil && !errors.Is(serr, http.ErrServerClosed) {
 			log.Printf("failed to serve HTTP: %v\n", serr)
 		}

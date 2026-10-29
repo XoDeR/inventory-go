@@ -2,3 +2,7 @@ bin/
 node_modules/
 openapi_bundled.yaml
 .coverage/
+
+# Generated environment files (see deploy/env)
+deploy/env/.env
+deploy/compose/*/.env

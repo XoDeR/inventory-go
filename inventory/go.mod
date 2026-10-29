@@ -3,7 +3,9 @@ module inventory-go/inventory
 go 1.27.2
 
 require (
+	github.com/caarlos0/env/v11 v11.3.1
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.26.3
+	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.12.1
 	go.mongodb.org/mongo-driver/v2 v2.9.2
 	google.golang.org/grpc v1.84.0

@@ -15,6 +15,7 @@ vars:
   PROTOC_GEN_VALIDATE_VERSION: 'v1.3.3'
   OGEN_VERSION: 'v1.24.0'
   YQ_VERSION: 'v4.54.1'
+  ENVSUBST_VERSION: 'v1.4.3'
   GRPCURL_VERSION: 'v1.9.4'
   MOCKERY_VERSION: 'v2.53.8'
 
@@ -35,6 +36,9 @@ vars:
   PROTOC_GEN_VALIDATE: '{{.BIN_DIR}}/protoc-gen-validate{{exeExt}}'
   GRPCURL: '{{.BIN_DIR}}/grpcurl{{exeExt}}'
   MOCKERY: '{{.BIN_DIR}}/mockery{{exeExt}}'
+  ENVSUBST: '{{.BIN_DIR}}/envsubst{{exeExt}}'
+  ENVDIR: '{{.ROOT_DIR}}/deploy/env'
+  SERVICES: inventory,order,payment
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
@@ -540,6 +544,40 @@ tasks:
       - cmd: xdg-open {{.COVERAGE_DIR}}/coverage.html || echo "📂 Report saved to {{.COVERAGE_DIR}}/coverage.html (open it manually)"
         platforms: [ linux ]
 
+  env:install-envsubst:
+    desc: "Installs envsubst into bin/"
+    cmds:
+      - |
+        [ -f {{.ENVSUBST}} ] || {
+          echo "📦 Installing envsubst {{.ENVSUBST_VERSION}}..."
+          GOBIN={{.BIN_DIR}} go install github.com/a8m/envsubst/cmd/envsubst@{{.ENVSUBST_VERSION}}
+        }
+        echo "✅ envsubst installed: {{.ENVSUBST}}"
+
+  env:generate:
+    desc: "Generates .env files for all services from the templates and the shared configuration file"
+    deps: [ env:install-envsubst ]
+    cmds:
+      - |
+        ENV_FILE="{{.ENVDIR}}/.env"
+        TEMPLATE_FILE="{{.ENVDIR}}/.env.template"
+        SCRIPT="{{.ENVDIR}}/generate-env.sh"
+
+        if [ ! -f "$ENV_FILE" ]; then
+          if [ -f "$TEMPLATE_FILE" ]; then
+            echo "🔄 File $ENV_FILE not found, creating it from the template $TEMPLATE_FILE"
+            cp "$TEMPLATE_FILE" "$ENV_FILE"
+            echo "✅ Created file $ENV_FILE. Check it and edit the variable values if needed."
+          else
+            echo "❌ Template $TEMPLATE_FILE not found!"
+            exit 1
+          fi
+        fi
+
+        # Pass the list of services as a comma-separated string
+        export SERVICES="{{.SERVICES}}"
+        ENV_SUBST={{.ENVSUBST}} bash "$SCRIPT"
+
   up-core:
     desc: "Starts the core containers (shared network)"
     dir: deploy/compose/core
@@ -555,6 +593,7 @@ tasks:
       - docker compose down --volumes
 
   up-order:
+    deps: [ env:generate ]
     desc: "Starts Order Service dependencies (PostgreSQL)"
     dir: deploy/compose/order
     cmds:
@@ -569,6 +608,7 @@ tasks:
       - docker compose down --volumes
 
   up-inventory:
+    deps: [ env:generate ]
     desc: "Starts Inventory Service dependencies (MongoDB)"
     dir: deploy/compose/inventory
     cmds:
