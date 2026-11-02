@@ -22,9 +22,9 @@ import (
 	"inventory-go/inventory/internal/config"
 	inventoryRepository "inventory-go/inventory/internal/repository/part"
 	inventoryService "inventory-go/inventory/internal/service/part"
+	"inventory-go/platform/pkg/logger"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
-	"inventory-go/shared/pkg/logger"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 

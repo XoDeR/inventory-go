@@ -10,6 +10,7 @@ require (
 	go.mongodb.org/mongo-driver/v2 v2.9.2
 	google.golang.org/grpc v1.84.0
 	google.golang.org/protobuf v1.36.12
+	inventory-go/platform v0.0.0
 	inventory-go/shared v0.0.0
 )
 
@@ -31,4 +32,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20261019180522-ce908d29299b // indirect
 )
 
+replace inventory-go/platform => ../platform
 replace inventory-go/shared => ../shared

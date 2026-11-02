@@ -19,7 +19,7 @@ vars:
   GRPCURL_VERSION: 'v1.9.4'
   MOCKERY_VERSION: 'v2.53.8'
 
-  MODULES: inventory order payment shared
+  MODULES: inventory order payment platform shared
   COVERAGE_MODULES: inventory order payment
   COVERAGE_DIR: '{{.ROOT_DIR}}/.coverage'
   BIN_DIR: '{{.ROOT_DIR}}/bin'

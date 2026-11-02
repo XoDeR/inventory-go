@@ -9,6 +9,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
+	inventory-go/platform v0.0.0
 	inventory-go/shared v0.0.0
 )
 
@@ -24,4 +25,5 @@ require (
 	google.golang.org/protobuf v1.36.12 // indirect
 )
 
+replace inventory-go/platform => ../platform
 replace inventory-go/shared => ../shared

@@ -13,6 +13,7 @@ require (
 	github.com/pressly/goose/v3 v3.29.0
 	github.com/stretchr/testify v1.12.1
 	google.golang.org/grpc v1.84.0
+	inventory-go/platform v0.0.0
 	inventory-go/shared v0.0.0
 )
 
@@ -60,4 +61,5 @@ require (
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 )
 
+replace inventory-go/platform => ../platform
 replace inventory-go/shared => ../shared

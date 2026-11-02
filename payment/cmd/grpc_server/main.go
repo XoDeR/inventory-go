@@ -19,9 +19,9 @@ import (
 	paymentV1API "inventory-go/payment/internal/api/payment/v1"
 	"inventory-go/payment/internal/config"
 	paymentService "inventory-go/payment/internal/service/payment"
+	"inventory-go/platform/pkg/logger"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
-	"inventory-go/shared/pkg/logger"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
 

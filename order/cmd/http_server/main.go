@@ -25,7 +25,7 @@ import (
 	orderRepository "inventory-go/order/internal/repository/order"
 	orderService "inventory-go/order/internal/service/order"
 	"inventory-go/order/migrations"
-	"inventory-go/shared/pkg/logger"
+	"inventory-go/platform/pkg/logger"
 	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
