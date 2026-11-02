@@ -62,4 +62,5 @@ require (
 )
 
 replace inventory-go/platform => ../platform
+
 replace inventory-go/shared => ../shared
