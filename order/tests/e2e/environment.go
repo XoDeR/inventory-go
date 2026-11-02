@@ -1,0 +1,235 @@
+//go:build e2e
+
+package e2e
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"time"
+
+	"github.com/testcontainers/testcontainers-go/wait"
+
+	"inventory-go/platform/pkg/logger"
+	"inventory-go/platform/pkg/testcontainers/app"
+	"inventory-go/platform/pkg/testcontainers/mongo"
+	"inventory-go/platform/pkg/testcontainers/network"
+	"inventory-go/platform/pkg/testcontainers/path"
+	"inventory-go/platform/pkg/testcontainers/postgres"
+)
+
+const (
+	// projectName is the name of the project for the Docker containers and the network
+	projectName = "order-service-e2e"
+
+	dockerfile = "deploy/docker/Dockerfile"
+
+	// Order service
+	orderAppName = "e2e-order-app"
+	orderHTTP    = "8080"
+
+	// Inventory service
+	inventoryAppName = "e2e-order-inventory-app"
+	inventoryGRPC    = "50051"
+	inventoryHTTP    = "8081"
+
+	// Payment service
+	paymentAppName = "e2e-order-payment-app"
+	paymentGRPC    = "50052"
+	paymentHTTP    = "8082"
+
+	// PostgreSQL of the order service
+	postgresName     = "e2e-order-postgres"
+	postgresImage    = "postgres:17-alpine"
+	postgresDatabase = "order-service"
+	postgresUser     = "order-service-user"
+	postgresPassword = "order-service-password"
+	postgresPort     = "5432"
+
+	// MongoDB of the inventory service
+	mongoName     = "e2e-order-mongo"
+	mongoImage    = "mongo:7.0.5"
+	mongoDatabase = "inventory-service"
+	mongoUser     = "inventory-service-user"
+	mongoPassword = "inventory-service-password"
+	mongoAuthDB   = "admin"
+	mongoPort     = "27017"
+
+	loggerLevelValue = "debug"
+	startupTimeout   = 3 * time.Minute
+	testsTimeout     = 15 * time.Minute
+)
+
+// TestEnvironment holds the resources of the test environment.
+type TestEnvironment struct {
+	Network   *network.Network
+	Postgres  *postgres.Container
+	Mongo     *mongo.Container
+	Inventory *app.Container
+	Payment   *app.Container
+	Order     *app.Container
+}
+
+// setupTestEnvironment prepares the whole chain: PostgreSQL and MongoDB, then the inventory,
+// payment and order services. The containers are started one after another to keep the load low.
+func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
+	logger.Info(ctx, "Preparing the test environment...")
+
+	env := &TestEnvironment{}
+
+	fail := func(msg string, err error) (*TestEnvironment, error) {
+		cleanupTestEnvironment(ctx, env)
+		return nil, fmt.Errorf("%s: %w", msg, err)
+	}
+
+	var err error
+
+	env.Network, err = network.NewNetwork(ctx, projectName)
+	if err != nil {
+		return fail("failed to create the network", err)
+	}
+	logger.Info(ctx, "Network created")
+
+	env.Postgres, err = postgres.NewContainer(ctx,
+		postgres.WithNetworkName(env.Network.Name()),
+		postgres.WithContainerName(postgresName),
+		postgres.WithImageName(postgresImage),
+		postgres.WithDatabase(postgresDatabase),
+		postgres.WithAuth(postgresUser, postgresPassword),
+		postgres.WithLogger(logger.Default()),
+	)
+	if err != nil {
+		return fail("failed to start the PostgreSQL container", err)
+	}
+
+	env.Mongo, err = mongo.NewContainer(ctx,
+		mongo.WithNetworkName(env.Network.Name()),
+		mongo.WithContainerName(mongoName),
+		mongo.WithImageName(mongoImage),
+		mongo.WithDatabase(mongoDatabase),
+		mongo.WithAuth(mongoUser, mongoPassword),
+		mongo.WithAuthDB(mongoAuthDB),
+		mongo.WithLogger(logger.Default()),
+	)
+	if err != nil {
+		return fail("failed to start the MongoDB container", err)
+	}
+
+	env.Inventory, err = startService(ctx, env.Network.Name(), "inventory", "grpc_server", inventoryAppName, inventoryGRPC, map[string]string{
+		"GRPC_HOST": "0.0.0.0",
+		"GRPC_PORT": inventoryGRPC,
+		"HTTP_HOST": "0.0.0.0",
+		"HTTP_PORT": inventoryHTTP,
+
+		"MONGO_HOST":                 mongoName,
+		"MONGO_PORT":                 mongoPort,
+		"MONGO_INITDB_DATABASE":      mongoDatabase,
+		"MONGO_INITDB_ROOT_USERNAME": mongoUser,
+		"MONGO_INITDB_ROOT_PASSWORD": mongoPassword,
+		"MONGO_AUTH_DB":              mongoAuthDB,
+	})
+	if err != nil {
+		return fail("failed to start the inventory service", err)
+	}
+
+	env.Payment, err = startService(ctx, env.Network.Name(), "payment", "grpc_server", paymentAppName, paymentGRPC, map[string]string{
+		"GRPC_HOST": "0.0.0.0",
+		"GRPC_PORT": paymentGRPC,
+		"HTTP_HOST": "0.0.0.0",
+		"HTTP_PORT": paymentHTTP,
+	})
+	if err != nil {
+		return fail("failed to start the payment service", err)
+	}
+
+	// the order service reaches the other containers by their names inside the Docker network
+	env.Order, err = startService(ctx, env.Network.Name(), "order", "http_server", orderAppName, orderHTTP, map[string]string{
+		"HTTP_HOST": "0.0.0.0",
+		"HTTP_PORT": orderHTTP,
+
+		"INVENTORY_GRPC_HOST": inventoryAppName,
+		"INVENTORY_GRPC_PORT": inventoryGRPC,
+		"PAYMENT_GRPC_HOST":   paymentAppName,
+		"PAYMENT_GRPC_PORT":   paymentGRPC,
+
+		"POSTGRES_HOST":     postgresName,
+		"POSTGRES_PORT":     postgresPort,
+		"POSTGRES_DB":       postgresDatabase,
+		"POSTGRES_USER":     postgresUser,
+		"POSTGRES_PASSWORD": postgresPassword,
+	})
+	if err != nil {
+		return fail("failed to start the order service", err)
+	}
+
+	logger.Info(ctx, "Test environment is ready")
+
+	return env, nil
+}
+
+// startService builds a service from the shared Dockerfile and starts it in the network.
+func startService(ctx context.Context, networkName, service, cmd, name, port string, appEnv map[string]string) (*app.Container, error) {
+	appEnv["LOGGER_LEVEL"] = loggerLevelValue
+	appEnv["LOGGER_AS_JSON"] = "true"
+
+	return app.NewContainer(ctx,
+		app.WithName(name),
+		app.WithPort(port),
+		app.WithDockerfile(path.GetProjectRoot(), dockerfile),
+		app.WithBuildArg("SERVICE", service),
+		app.WithBuildArg("CMD", cmd),
+		app.WithNetwork(networkName),
+		app.WithEnv(appEnv),
+		app.WithLogOutput(os.Stdout),
+		app.WithStartupWait(wait.ForListeningPort(port+"/tcp").WithStartupTimeout(startupTimeout)),
+		app.WithLogger(logger.Default()),
+	)
+}
+
+// teardownTestEnvironment releases all resources of the test environment.
+func teardownTestEnvironment(ctx context.Context, env *TestEnvironment) {
+	logger.Info(ctx, "Cleaning up the test environment...")
+
+	cleanupTestEnvironment(ctx, env)
+
+	logger.Info(ctx, "Test environment cleaned up")
+}
+
+// cleanupTestEnvironment releases the resources that were created, in the reverse order of the start.
+func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
+	for name, c := range map[string]*app.Container{
+		"order":     env.Order,
+		"payment":   env.Payment,
+		"inventory": env.Inventory,
+	} {
+		if c == nil {
+			continue
+		}
+
+		if err := c.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the service container", "service", name, "error", err)
+		} else {
+			logger.Info(ctx, "Service container stopped", "service", name)
+		}
+	}
+
+	if env.Mongo != nil {
+		if err := env.Mongo.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the MongoDB container", "error", err)
+		}
+	}
+
+	if env.Postgres != nil {
+		if err := env.Postgres.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the PostgreSQL container", "error", err)
+		}
+	}
+
+	if env.Network != nil {
+		if err := env.Network.Remove(ctx); err != nil {
+			logger.Error(ctx, "failed to remove the network", "error", err)
+		} else {
+			logger.Info(ctx, "Network removed")
+		}
+	}
+}

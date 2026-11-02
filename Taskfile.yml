@@ -496,6 +496,43 @@ tasks:
         done
         exit $ERR
 
+  test-e2e:
+    desc: "Runs the e2e tests of all services in Docker (testcontainers; needs a running Docker)"
+    cmds:
+      - task: test-e2e:inventory
+      - task: test-e2e:payment
+      - task: test-e2e:order
+
+  test-e2e:inventory:
+    desc: "Runs the e2e tests of the inventory service"
+    dir: inventory/tests/e2e
+    env:
+      # On Windows testcontainers resolves the Docker socket to a named pipe path and mounts it into
+      # the Linux Ryuk container, which then cannot reach Docker. Mount the in-VM socket instead.
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: '{{if eq OS "windows"}}/var/run/docker.sock{{end}}'
+    cmds:
+      - go test -tags e2e -count=1 -v ./...
+
+  test-e2e:payment:
+    desc: "Runs the e2e tests of the payment service"
+    dir: payment/tests/e2e
+    env:
+      # On Windows testcontainers resolves the Docker socket to a named pipe path and mounts it into
+      # the Linux Ryuk container, which then cannot reach Docker. Mount the in-VM socket instead.
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: '{{if eq OS "windows"}}/var/run/docker.sock{{end}}'
+    cmds:
+      - go test -tags e2e -count=1 -v ./...
+
+  test-e2e:order:
+    desc: "Runs the e2e tests of the order service (starts the whole chain: order, inventory, payment)"
+    dir: order/tests/e2e
+    env:
+      # On Windows testcontainers resolves the Docker socket to a named pipe path and mounts it into
+      # the Linux Ryuk container, which then cannot reach Docker. Mount the in-VM socket instead.
+      TESTCONTAINERS_DOCKER_SOCKET_OVERRIDE: '{{if eq OS "windows"}}/var/run/docker.sock{{end}}'
+    cmds:
+      - go test -tags e2e -count=1 -v ./...
+
   test-coverage:
     desc: "Tests with business logic coverage, automatically discovering and analyzing all modules"
     cmds:

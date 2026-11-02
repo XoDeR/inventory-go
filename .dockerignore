@@ -1,0 +1,24 @@
+# Keeps the Docker build context small and the layer cache effective.
+
+# Build output and tools
+bin/
+.coverage/
+node_modules/
+
+# Generated environment files hold local settings and must not end up in images
+deploy/env/.env
+deploy/compose/*/.env
+
+# VCS and IDE files
+.git
+.gitignore
+.idea
+.vscode
+
+# Temporary files
+*.swp
+*.swo
+*.tmp
+*.log
+.DS_Store
+Thumbs.db
