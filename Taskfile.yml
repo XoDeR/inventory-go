@@ -38,7 +38,7 @@ vars:
   MOCKERY: '{{.BIN_DIR}}/mockery{{exeExt}}'
   ENVSUBST: '{{.BIN_DIR}}/envsubst{{exeExt}}'
   ENVDIR: '{{.ROOT_DIR}}/deploy/env'
-  SERVICES: inventory,order,payment
+  SERVICES: core,inventory,order,payment
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
@@ -618,7 +618,8 @@ tasks:
         . "$SCRIPT"
 
   up-core:
-    desc: "Starts the core containers (shared network)"
+    deps: [ env:generate ]
+    desc: "Starts the core containers (shared network, Kafka, Kafka UI)"
     dir: deploy/compose/core
     cmds:
       - echo "[task] 🚀 Starting core containers"
