@@ -26,3 +26,12 @@ packages:
   inventory-go/payment/internal/service:
     config:
       include-regex: ".*Service"
+  inventory-go/assembly/internal/service:
+    config:
+      include-regex: ".*Service"
+  inventory-go/notification/internal/service:
+    config:
+      include-regex: ".*Service"
+  inventory-go/notification/internal/client/notifier:
+    config:
+      include-regex: "Notifier"

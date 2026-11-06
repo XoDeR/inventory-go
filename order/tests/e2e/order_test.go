@@ -5,6 +5,7 @@ package e2e
 import (
 	"context"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 	. "github.com/onsi/ginkgo/v2"
@@ -124,6 +125,27 @@ var _ = Describe("OrderService", func() {
 			transactionUUID, set := order.TransactionUUID.Get()
 			Expect(set).To(BeTrue())
 			Expect(transactionUUID).To(Equal(paid.TransactionUUID))
+		})
+
+		It("completes a paid order once the computer is assembled", func() {
+			created := createOrder(seededCPU)
+
+			_, err := client.PayOrder(ctx,
+				&orderV1.PayOrderRequest{PaymentMethod: orderV1.PaymentMethodCARD},
+				orderV1.PayOrderParams{OrderUUID: created.UUID},
+			)
+			Expect(err).ToNot(HaveOccurred())
+
+			// OrderPaid -> assembly service (waits) -> ComputerAssembled -> order service
+			Eventually(func() orderV1.OrderStatus {
+				getRes, err := client.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: created.UUID})
+				Expect(err).ToNot(HaveOccurred())
+
+				order, ok := getRes.(*orderV1.Order)
+				Expect(ok).To(BeTrue())
+
+				return order.Status
+			}).WithTimeout(time.Minute).WithPolling(time.Second).Should(Equal(orderV1.OrderStatusCOMPLETED))
 		})
 
 		It("returns NotFound when paying an unknown order", func() {

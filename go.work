@@ -5,5 +5,7 @@ use (
 	./inventory
 	./order
 	./payment
+	./assembly
+	./notification
 	./shared
 )

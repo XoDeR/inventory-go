@@ -190,6 +190,7 @@ components:
         - PENDING_PAYMENT
         - PAID
         - CANCELLED
+        - COMPLETED
     order:
       type: object
       required:

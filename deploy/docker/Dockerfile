@@ -27,6 +27,8 @@ COPY shared/go.mod shared/go.sum ./shared/
 COPY inventory/go.mod inventory/go.sum ./inventory/
 COPY order/go.mod order/go.sum ./order/
 COPY payment/go.mod payment/go.sum ./payment/
+COPY assembly/go.mod assembly/go.sum ./assembly/
+COPY notification/go.mod notification/go.sum ./notification/
 
 RUN go mod download
 
@@ -35,6 +37,8 @@ COPY shared ./shared
 COPY inventory ./inventory
 COPY order ./order
 COPY payment ./payment
+COPY assembly ./assembly
+COPY notification ./notification
 
 # Build a static Linux binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o /app/service ./${SERVICE}/cmd/${CMD}

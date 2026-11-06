@@ -40,11 +40,12 @@ func New(ctx context.Context) (*App, error) {
 	return a, nil
 }
 
-// Run serves HTTP until the server fails or ctx is cancelled.
+// Run serves HTTP and consumes Kafka events until the server fails or ctx is cancelled.
 func (a *App) Run(ctx context.Context) error {
-	errCh := make(chan error, 1)
+	errCh := make(chan error, 2)
 
 	go func() { errCh <- a.runHTTPServer(ctx) }()
+	go func() { errCh <- a.runConsumer(ctx) }()
 
 	select {
 	case <-ctx.Done():
@@ -60,6 +61,7 @@ func (a *App) initDeps(ctx context.Context) error {
 		a.initLogger,
 		a.initCloser,
 		a.runMigrations,
+		a.initConsumer,
 		a.initHTTPServer,
 	}
 
@@ -142,5 +144,20 @@ func (a *App) runHTTPServer(ctx context.Context) error {
 		return err
 	}
 
+	return nil
+}
+
+func (a *App) runConsumer(ctx context.Context) error {
+	err := a.diContainer.OrderConsumerService(ctx).RunConsumer(ctx)
+	if err != nil && !errors.Is(err, context.Canceled) {
+		return err
+	}
+
+	return nil
+}
+
+// initConsumer builds the Kafka consumer eagerly, so a misconfiguration fails the startup.
+func (a *App) initConsumer(ctx context.Context) error {
+	a.diContainer.OrderConsumerService(ctx)
 	return nil
 }

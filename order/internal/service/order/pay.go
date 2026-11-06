@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 
 	"inventory-go/order/internal/model"
+	"inventory-go/platform/pkg/logger"
 )
 
 func (s *service) Pay(ctx context.Context, orderUUID uuid.UUID, method model.PaymentMethod) (uuid.UUID, error) {
@@ -34,6 +35,19 @@ func (s *service) Pay(ctx context.Context, orderUUID uuid.UUID, method model.Pay
 
 	if err := s.orderRepository.Update(ctx, order); err != nil {
 		return uuid.Nil, err
+	}
+
+	// The payment is already done and saved, so a Kafka failure must not fail the request:
+	// it is logged and the order stays PAID (there is no outbox yet to retry the publication).
+	err = s.orderProducer.ProduceOrderPaid(ctx, model.OrderPaidEvent{
+		EventUUID:       uuid.New(),
+		OrderUUID:       order.Uuid,
+		UserUUID:        order.UserUuid,
+		PaymentMethod:   method,
+		TransactionUUID: transactionUUID,
+	})
+	if err != nil {
+		logger.Error(ctx, "failed to publish the OrderPaid event", "order_uuid", order.Uuid, "error", err)
 	}
 
 	return transactionUUID, nil

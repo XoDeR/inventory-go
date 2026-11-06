@@ -15,3 +15,14 @@ type OrderService interface {
 	Pay(ctx context.Context, uuid uuid.UUID, method model.PaymentMethod) (uuid.UUID, error)
 	Cancel(ctx context.Context, uuid uuid.UUID) error
 }
+
+// OrderProducerService publishes order events to Kafka.
+type OrderProducerService interface {
+	ProduceOrderPaid(ctx context.Context, event model.OrderPaidEvent) error
+}
+
+// OrderConsumerService consumes events addressed to the order service from Kafka.
+type OrderConsumerService interface {
+	// RunConsumer blocks until ctx is cancelled or the consumer fails.
+	RunConsumer(ctx context.Context) error
+}

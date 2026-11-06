@@ -117,7 +117,7 @@ Cancels an order.
 | total_price      | double   | Total price                                      |
 | transaction_uuid | *string  | Transaction UUID (if paid)                       |
 | payment_method   | *string  | Payment method (if paid)                         |
-| status           | string   | Status (`PENDING_PAYMENT`, `PAID`, `CANCELLED`)  |
+| status           | string   | Status (`PENDING_PAYMENT`, `PAID`, `CANCELLED`, `COMPLETED`)  |
 
 ---
 

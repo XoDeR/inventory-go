@@ -11,11 +11,14 @@ import (
 var appConfig *config
 
 type config struct {
-	Logger    LoggerConfig
-	HTTP      OrderHTTPConfig
-	Inventory InventoryClientConfig
-	Payment   PaymentClientConfig
-	Postgres  PostgresConfig
+	Logger                 LoggerConfig
+	HTTP                   OrderHTTPConfig
+	Inventory              InventoryClientConfig
+	Payment                PaymentClientConfig
+	Postgres               PostgresConfig
+	Kafka                  KafkaConfig
+	OrderPaidProducer      OrderPaidProducerConfig
+	OrderAssembledConsumer OrderAssembledConsumerConfig
 }
 
 // Load reads the given .env files (a missing file is not an error, the process
@@ -51,12 +54,30 @@ func Load(path ...string) error {
 		return err
 	}
 
+	kafkaCfg, err := env.NewKafkaConfig()
+	if err != nil {
+		return err
+	}
+
+	orderPaidProducerCfg, err := env.NewOrderPaidProducerConfig()
+	if err != nil {
+		return err
+	}
+
+	orderAssembledConsumerCfg, err := env.NewOrderAssembledConsumerConfig()
+	if err != nil {
+		return err
+	}
+
 	appConfig = &config{
-		Logger:    loggerCfg,
-		HTTP:      httpCfg,
-		Inventory: inventoryCfg,
-		Payment:   paymentCfg,
-		Postgres:  postgresCfg,
+		Logger:                 loggerCfg,
+		HTTP:                   httpCfg,
+		Inventory:              inventoryCfg,
+		Payment:                paymentCfg,
+		Postgres:               postgresCfg,
+		Kafka:                  kafkaCfg,
+		OrderPaidProducer:      orderPaidProducerCfg,
+		OrderAssembledConsumer: orderAssembledConsumerCfg,
 	}
 
 	return nil

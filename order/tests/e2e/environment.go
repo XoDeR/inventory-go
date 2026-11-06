@@ -12,6 +12,7 @@ import (
 
 	"inventory-go/platform/pkg/logger"
 	"inventory-go/platform/pkg/testcontainers/app"
+	"inventory-go/platform/pkg/testcontainers/kafka"
 	"inventory-go/platform/pkg/testcontainers/mongo"
 	"inventory-go/platform/pkg/testcontainers/network"
 	"inventory-go/platform/pkg/testcontainers/path"
@@ -37,6 +38,17 @@ const (
 	paymentAppName = "e2e-order-payment-app"
 	paymentGRPC    = "50052"
 	paymentHTTP    = "8082"
+
+	// Assembly service (a Kafka consumer without a server port)
+	assemblyAppName  = "e2e-order-assembly-app"
+	assemblyDuration = "2s"
+
+	// Kafka
+	kafkaName  = "e2e-order-kafka"
+	kafkaImage = "confluentinc/cp-kafka:7.9.0"
+
+	orderPaidTopic         = "order.paid"
+	computerAssembledTopic = "assembly.computer-assembled"
 
 	// PostgreSQL of the order service
 	postgresName     = "e2e-order-postgres"
@@ -64,9 +76,11 @@ const (
 type TestEnvironment struct {
 	Network   *network.Network
 	Postgres  *postgres.Container
+	Kafka     *kafka.Container
 	Mongo     *mongo.Container
 	Inventory *app.Container
 	Payment   *app.Container
+	Assembly  *app.Container
 	Order     *app.Container
 }
 
@@ -100,6 +114,16 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 	)
 	if err != nil {
 		return fail("failed to start the PostgreSQL container", err)
+	}
+
+	env.Kafka, err = kafka.NewContainer(ctx,
+		kafka.WithNetworkName(env.Network.Name()),
+		kafka.WithContainerName(kafkaName),
+		kafka.WithImageName(kafkaImage),
+		kafka.WithLogger(logger.Default()),
+	)
+	if err != nil {
+		return fail("failed to start the Kafka container", err)
 	}
 
 	env.Mongo, err = mongo.NewContainer(ctx,
@@ -142,6 +166,32 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		return fail("failed to start the payment service", err)
 	}
 
+	// the assembly service turns OrderPaid into ComputerAssembled after a short delay;
+	// it has no server, so the container is considered started once the consumer runs
+	env.Assembly, err = app.NewContainer(ctx,
+		app.WithName(assemblyAppName),
+		app.WithPort("8080"),
+		app.WithDockerfile(path.GetProjectRoot(), dockerfile),
+		app.WithBuildArg("SERVICE", "assembly"),
+		app.WithBuildArg("CMD", "consumer"),
+		app.WithNetwork(env.Network.Name()),
+		app.WithEnv(map[string]string{
+			"KAFKA_BROKERS":                 env.Kafka.Address(),
+			"ORDER_PAID_TOPIC_NAME":         orderPaidTopic,
+			"ORDER_PAID_CONSUMER_GROUP_ID":  "e2e-assembly-service",
+			"COMPUTER_ASSEMBLED_TOPIC_NAME": computerAssembledTopic,
+			"ASSEMBLY_DURATION":             assemblyDuration,
+			"LOGGER_LEVEL":                  loggerLevelValue,
+			"LOGGER_AS_JSON":                "true",
+		}),
+		app.WithLogOutput(os.Stdout),
+		app.WithStartupWait(wait.ForLog("Starting the OrderPaid consumer").WithStartupTimeout(startupTimeout)),
+		app.WithLogger(logger.Default()),
+	)
+	if err != nil {
+		return fail("failed to start the assembly service", err)
+	}
+
 	// the order service reaches the other containers by their names inside the Docker network
 	env.Order, err = startService(ctx, env.Network.Name(), "order", "http_server", orderAppName, orderHTTP, map[string]string{
 		"HTTP_HOST": "0.0.0.0",
@@ -157,6 +207,11 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"POSTGRES_DB":       postgresDatabase,
 		"POSTGRES_USER":     postgresUser,
 		"POSTGRES_PASSWORD": postgresPassword,
+
+		"KAFKA_BROKERS":                     env.Kafka.Address(),
+		"ORDER_PAID_TOPIC_NAME":             orderPaidTopic,
+		"COMPUTER_ASSEMBLED_TOPIC_NAME":     computerAssembledTopic,
+		"ORDER_ASSEMBLED_CONSUMER_GROUP_ID": "e2e-order-service",
 	})
 	if err != nil {
 		return fail("failed to start the order service", err)
@@ -199,6 +254,7 @@ func teardownTestEnvironment(ctx context.Context, env *TestEnvironment) {
 func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 	for name, c := range map[string]*app.Container{
 		"order":     env.Order,
+		"assembly":  env.Assembly,
 		"payment":   env.Payment,
 		"inventory": env.Inventory,
 	} {
@@ -210,6 +266,12 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 			logger.Error(ctx, "failed to stop the service container", "service", name, "error", err)
 		} else {
 			logger.Info(ctx, "Service container stopped", "service", name)
+		}
+	}
+
+	if env.Kafka != nil {
+		if err := env.Kafka.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the Kafka container", "error", err)
 		}
 	}
 

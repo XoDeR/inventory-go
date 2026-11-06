@@ -7,6 +7,7 @@ import (
 
 	grpcMocks "inventory-go/order/internal/client/grpc/mocks"
 	repoMocks "inventory-go/order/internal/repository/mocks"
+	serviceMocks "inventory-go/order/internal/service/mocks"
 )
 
 type ServiceSuite struct {
@@ -16,6 +17,7 @@ type ServiceSuite struct {
 
 	inventoryClient *grpcMocks.InventoryClient
 	paymentClient   *grpcMocks.PaymentClient
+	orderProducer   *serviceMocks.OrderProducerService
 
 	service *service
 }
@@ -27,8 +29,9 @@ func (s *ServiceSuite) SetupTest() {
 
 	s.inventoryClient = grpcMocks.NewInventoryClient(s.T())
 	s.paymentClient = grpcMocks.NewPaymentClient(s.T())
+	s.orderProducer = serviceMocks.NewOrderProducerService(s.T())
 
-	s.service = NewService(s.orderRepository, s.inventoryClient, s.paymentClient)
+	s.service = NewService(s.orderRepository, s.inventoryClient, s.paymentClient, s.orderProducer)
 }
 
 func TestServiceSuite(t *testing.T) {

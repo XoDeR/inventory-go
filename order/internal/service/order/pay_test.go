@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/mock"
 
 	"inventory-go/order/internal/model"
 )
@@ -39,6 +40,9 @@ func (s *ServiceSuite) TestPaySuccess() {
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
 	s.paymentClient.EXPECT().PayOrder(ctx, payInfo).Return(transactionID.String(), nil)
 	s.orderRepository.EXPECT().Update(ctx, paidOrder).Return(nil)
+	s.orderProducer.EXPECT().ProduceOrderPaid(ctx, mock.MatchedBy(func(e model.OrderPaidEvent) bool {
+		return e.OrderUUID == orderUUID && e.UserUUID == userUUID && e.TransactionUUID == transactionID && e.PaymentMethod == method
+	})).Return(nil)
 
 	result, err := s.service.Pay(ctx, orderUUID, method)
 
@@ -132,4 +136,25 @@ func (s *ServiceSuite) TestPayUpdateError() {
 
 	s.Require().ErrorIs(err, repoErr)
 	s.Require().Equal(uuid.Nil, result)
+}
+
+// A Kafka failure must not fail the request: the order is already paid and saved.
+func (s *ServiceSuite) TestPayProducerErrorIsIgnored() {
+	var (
+		ctx           = context.Background()
+		orderUUID     = uuid.New()
+		transactionID = uuid.New()
+		method        = model.PaymentMethodCard
+		storedOrder   = model.Order{Uuid: orderUUID, UserUuid: uuid.New(), Status: model.OrderStatusPendingPayment}
+	)
+
+	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
+	s.paymentClient.EXPECT().PayOrder(ctx, mock.Anything).Return(transactionID.String(), nil)
+	s.orderRepository.EXPECT().Update(ctx, mock.Anything).Return(nil)
+	s.orderProducer.EXPECT().ProduceOrderPaid(ctx, mock.Anything).Return(errors.New("kafka is down"))
+
+	result, err := s.service.Pay(ctx, orderUUID, method)
+
+	s.Require().NoError(err)
+	s.Require().Equal(transactionID, result)
 }

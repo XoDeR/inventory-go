@@ -8,6 +8,7 @@ const (
 	OrderStatusPendingPayment OrderStatus = "PENDING_PAYMENT"
 	OrderStatusPaid           OrderStatus = "PAID"
 	OrderStatusCancelled      OrderStatus = "CANCELLED"
+	OrderStatusCompleted      OrderStatus = "COMPLETED"
 )
 
 type PaymentMethod string
@@ -32,4 +33,21 @@ type Order struct {
 type CreateOrderInfo struct {
 	UserUuid  uuid.UUID
 	PartUuids []uuid.UUID
+}
+
+// OrderPaidEvent is the event published after an order was paid.
+type OrderPaidEvent struct {
+	EventUUID       uuid.UUID
+	OrderUUID       uuid.UUID
+	UserUUID        uuid.UUID
+	PaymentMethod   PaymentMethod
+	TransactionUUID uuid.UUID
+}
+
+// ComputerAssembledEvent is the event received after the computer of an order was assembled.
+type ComputerAssembledEvent struct {
+	EventUUID    uuid.UUID
+	OrderUUID    uuid.UUID
+	UserUUID     uuid.UUID
+	BuildTimeSec int64
 }
