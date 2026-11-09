@@ -25,10 +25,11 @@ func TestNotifyOrderPaid(t *testing.T) {
 		TransactionUUID: uuid.New(),
 	}
 
-	n.EXPECT().Send(ctx, "Order "+event.OrderUUID.String()+" was paid.\n"+
-		"User: "+event.UserUUID.String()+"\n"+
+	n.EXPECT().Send(ctx, ":moneybag: *Order paid*\n"+
+		"Order: `"+event.OrderUUID.String()+"`\n"+
+		"User: `"+event.UserUUID.String()+"`\n"+
 		"Payment method: CARD\n"+
-		"Transaction: "+event.TransactionUUID.String()).Return(nil)
+		"Transaction: `"+event.TransactionUUID.String()+"`").Return(nil)
 
 	require.NoError(t, s.NotifyOrderPaid(ctx, event))
 }
@@ -40,8 +41,10 @@ func TestNotifyComputerAssembled(t *testing.T) {
 
 	event := model.ComputerAssembledEvent{OrderUUID: uuid.New(), UserUUID: uuid.New(), BuildTimeSec: 10}
 
-	n.EXPECT().Send(ctx, "The computer for order "+event.OrderUUID.String()+" is assembled in 10 s.\n"+
-		"User: "+event.UserUUID.String()).Return(nil)
+	n.EXPECT().Send(ctx, ":computer: *Computer assembled*\n"+
+		"Order: `"+event.OrderUUID.String()+"`\n"+
+		"User: `"+event.UserUUID.String()+"`\n"+
+		"Build time: 10 s").Return(nil)
 
 	require.NoError(t, s.NotifyComputerAssembled(ctx, event))
 }

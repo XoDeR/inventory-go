@@ -11,6 +11,12 @@ type KafkaConfig interface {
 	Brokers() []string
 }
 
+type SlackBotConfig interface {
+	BotToken() string
+	AppToken() string
+	ChannelID() string
+}
+
 type OrderPaidConsumerConfig interface {
 	Topic() string
 	GroupID() string

@@ -3,7 +3,9 @@ package notification
 import (
 	"bytes"
 	"context"
+	"embed"
 	"fmt"
+	"strings"
 	"text/template"
 
 	"inventory-go/notification/internal/client/notifier"
@@ -13,16 +15,16 @@ import (
 
 var _ def.NotificationService = (*service)(nil)
 
-var (
-	orderPaidTemplate = template.Must(template.New("order_paid").Parse(
-		`Order {{.OrderUUID}} was paid.
-User: {{.UserUUID}}
-Payment method: {{.PaymentMethod}}
-Transaction: {{.TransactionUUID}}`))
+// The templates are written in Slack mrkdwn (*bold*, `code`), parsed once at startup.
+//
+//go:embed templates/*.tmpl
+var templatesFS embed.FS
 
-	computerAssembledTemplate = template.Must(template.New("computer_assembled").Parse(
-		`The computer for order {{.OrderUUID}} is assembled in {{.BuildTimeSec}} s.
-User: {{.UserUUID}}`))
+var (
+	templates = template.Must(template.ParseFS(templatesFS, "templates/*.tmpl"))
+
+	orderPaidTemplate         = templates.Lookup("paid_notification.tmpl")
+	computerAssembledTemplate = templates.Lookup("assembled_notification.tmpl")
 )
 
 type service struct {
@@ -47,5 +49,5 @@ func (s *service) send(ctx context.Context, tmpl *template.Template, data any) e
 		return fmt.Errorf("failed to render the %s message: %w", tmpl.Name(), err)
 	}
 
-	return s.notifier.Send(ctx, buf.String())
+	return s.notifier.Send(ctx, strings.TrimSpace(buf.String()))
 }

@@ -676,6 +676,49 @@ tasks:
       - task: down-order
       - task: down-core
 
+  run:build:
+    desc: "Builds the binaries of all services into bin/services"
+    cmds:
+      - go build -o {{.BIN_DIR}}/services/inventory{{exeExt}} ./inventory/cmd/grpc_server
+      - go build -o {{.BIN_DIR}}/services/payment{{exeExt}} ./payment/cmd/grpc_server
+      - go build -o {{.BIN_DIR}}/services/order{{exeExt}} ./order/cmd/http_server
+      - go build -o {{.BIN_DIR}}/services/assembly{{exeExt}} ./assembly/cmd/consumer
+      - go build -o {{.BIN_DIR}}/services/notification{{exeExt}} ./notification/cmd/consumer
+
+  run:inventory:
+    desc: "Runs the Inventory service"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/inventory{{exeExt}}'
+
+  run:payment:
+    desc: "Runs the Payment service"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/payment{{exeExt}}'
+
+  run:order:
+    desc: "Runs the Order service"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/order{{exeExt}}'
+
+  run:assembly:
+    desc: "Runs the Assembly service"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/assembly{{exeExt}}'
+
+  run:notification:
+    desc: "Runs the Notification service (Slack)"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/notification{{exeExt}}'
+
+  run-all:
+    desc: "Builds and runs all five services in one terminal (Ctrl+C stops them). Needs the infrastructure: task up-all"
+    deps: [ run:inventory, run:payment, run:order, run:assembly, run:notification ]
+
   down-core:keep-volumes:
     desc: "Stops and removes the core containers, keeps volumes"
     dir: deploy/compose/core

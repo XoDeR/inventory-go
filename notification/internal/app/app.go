@@ -24,12 +24,18 @@ func New(ctx context.Context) (*App, error) {
 	return a, nil
 }
 
-// Run consumes OrderPaid and ComputerAssembled events until a consumer fails or ctx is cancelled.
+// Run consumes OrderPaid and ComputerAssembled events and serves the Slack /start command
+// until one of them fails or ctx is cancelled.
 func (a *App) Run(ctx context.Context) error {
-	errCh := make(chan error, 2)
+	// When one component fails, cancel the others too, so they stop before the closer runs.
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	errCh := make(chan error, 3)
 
 	go func() { errCh <- a.diContainer.OrderPaidConsumer().Run(ctx) }()
 	go func() { errCh <- a.diContainer.ComputerAssembledConsumer().Run(ctx) }()
+	go func() { errCh <- a.diContainer.SlackBot().Run(ctx) }()
 
 	select {
 	case <-ctx.Done():
@@ -82,6 +88,7 @@ func (a *App) initCloser(_ context.Context) error {
 func (a *App) initKafka(_ context.Context) error {
 	a.diContainer.OrderPaidConsumer()
 	a.diContainer.ComputerAssembledConsumer()
+	a.diContainer.SlackBot()
 
 	return nil
 }

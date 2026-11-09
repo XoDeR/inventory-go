@@ -15,6 +15,7 @@ type config struct {
 	Kafka                     KafkaConfig
 	OrderPaidConsumer         OrderPaidConsumerConfig
 	ComputerAssembledConsumer ComputerAssembledConsumerConfig
+	SlackBot                  SlackBotConfig
 }
 
 // Load reads the given .env files (a missing file is not an error, the process
@@ -45,11 +46,17 @@ func Load(path ...string) error {
 		return err
 	}
 
+	slackBotCfg, err := env.NewSlackBotConfig()
+	if err != nil {
+		return err
+	}
+
 	appConfig = &config{
 		Logger:                    loggerCfg,
 		Kafka:                     kafkaCfg,
 		OrderPaidConsumer:         orderPaidConsumerCfg,
 		ComputerAssembledConsumer: computerAssembledConsumerCfg,
+		SlackBot:                  slackBotCfg,
 	}
 
 	return nil

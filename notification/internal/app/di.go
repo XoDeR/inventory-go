@@ -5,11 +5,13 @@ import (
 	"fmt"
 
 	"github.com/IBM/sarama"
+	"github.com/slack-go/slack"
 
 	"inventory-go/notification/internal/api/consumer/computer_assembled"
+	"inventory-go/notification/internal/api/slack/bot"
 	"inventory-go/notification/internal/api/consumer/order_paid"
 	"inventory-go/notification/internal/client/notifier"
-	logNotifier "inventory-go/notification/internal/client/notifier/log"
+	slackNotifier "inventory-go/notification/internal/client/notifier/slack"
 	"inventory-go/notification/internal/config"
 	"inventory-go/notification/internal/service"
 	notificationService "inventory-go/notification/internal/service/notification"
@@ -28,6 +30,8 @@ type diContainer struct {
 
 	notificationService service.NotificationService
 	notifier            notifier.Notifier
+	slackAPI            *slack.Client
+	slackBot            *bot.Bot
 
 	kafkaOrderPaidConsumer         kafka.Consumer
 	kafkaComputerAssembledConsumer kafka.Consumer
@@ -64,13 +68,33 @@ func (d *diContainer) NotificationService() service.NotificationService {
 	return d.notificationService
 }
 
-// Notifier is the place to plug in the Slack notifier later.
 func (d *diContainer) Notifier() notifier.Notifier {
 	if d.notifier == nil {
-		d.notifier = logNotifier.NewNotifier()
+		d.notifier = slackNotifier.NewNotifier(d.SlackAPI(), config.AppConfig().SlackBot.ChannelID())
 	}
 
 	return d.notifier
+}
+
+// SlackBot serves the slash commands. Its shutdown waits for the Socket Mode loop to stop,
+// which happens when the context given to Run is cancelled.
+func (d *diContainer) SlackBot() *bot.Bot {
+	if d.slackBot == nil {
+		d.slackBot = bot.NewBot(d.SlackAPI())
+		closer.AddNamed("Slack bot", d.slackBot.Close)
+	}
+
+	return d.slackBot
+}
+
+// SlackAPI is the Slack client shared by the notifier and the Socket Mode bot.
+func (d *diContainer) SlackAPI() *slack.Client {
+	if d.slackAPI == nil {
+		cfg := config.AppConfig().SlackBot
+		d.slackAPI = slack.New(cfg.BotToken(), slack.OptionAppLevelToken(cfg.AppToken()))
+	}
+
+	return d.slackAPI
 }
 
 func (d *diContainer) KafkaOrderPaidConsumer() kafka.Consumer {
