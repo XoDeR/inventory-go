@@ -16,6 +16,7 @@ type config struct {
 	Inventory              InventoryClientConfig
 	Payment                PaymentClientConfig
 	Postgres               PostgresConfig
+	Redis                  RedisConfig
 	Kafka                  KafkaConfig
 	OrderPaidProducer      OrderPaidProducerConfig
 	OrderAssembledConsumer OrderAssembledConsumerConfig
@@ -49,6 +50,11 @@ func Load(path ...string) error {
 		return err
 	}
 
+	redisCfg, err := env.NewRedisConfig()
+	if err != nil {
+		return err
+	}
+
 	loggerCfg, err := env.NewLoggerConfig()
 	if err != nil {
 		return err
@@ -75,6 +81,7 @@ func Load(path ...string) error {
 		Inventory:              inventoryCfg,
 		Payment:                paymentCfg,
 		Postgres:               postgresCfg,
+		Redis:                  redisCfg,
 		Kafka:                  kafkaCfg,
 		OrderPaidProducer:      orderPaidProducerCfg,
 		OrderAssembledConsumer: orderAssembledConsumerCfg,

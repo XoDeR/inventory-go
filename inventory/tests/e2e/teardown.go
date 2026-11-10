@@ -27,6 +27,14 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 		}
 	}
 
+	if env.Redis != nil {
+		if err := env.Redis.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the Redis container", "error", err)
+		} else {
+			logger.Info(ctx, "Redis container stopped")
+		}
+	}
+
 	if env.Mongo != nil {
 		if err := env.Mongo.Terminate(ctx); err != nil {
 			logger.Error(ctx, "failed to stop the MongoDB container", "error", err)

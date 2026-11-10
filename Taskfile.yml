@@ -634,14 +634,14 @@ tasks:
 
   up-order:
     deps: [ env:generate ]
-    desc: "Starts Order Service dependencies (PostgreSQL)"
+    desc: "Starts Order Service dependencies (PostgreSQL, Redis)"
     dir: deploy/compose/order
     cmds:
       - echo "[task] 📦 Starting Order Service dependencies"
       - docker compose up --build --detach
 
   down-order:
-    desc: "Stops and removes Order Service dependencies (PostgreSQL)"
+    desc: "Stops and removes Order Service dependencies (PostgreSQL, Redis)"
     dir: deploy/compose/order
     cmds:
       - echo "[task] 🛑 Stopping Order Service dependencies"
@@ -649,14 +649,14 @@ tasks:
 
   up-inventory:
     deps: [ env:generate ]
-    desc: "Starts Inventory Service dependencies (MongoDB)"
+    desc: "Starts Inventory Service dependencies (MongoDB, Redis)"
     dir: deploy/compose/inventory
     cmds:
       - echo "[task] 📦 Starting Inventory Service dependencies"
       - docker compose up --build --detach
 
   down-inventory:
-    desc: "Stops and removes Inventory Service dependencies (MongoDB)"
+    desc: "Stops and removes Inventory Service dependencies (MongoDB, Redis)"
     dir: deploy/compose/inventory
     cmds:
       - echo "[task] 🛑 Stopping Inventory Service dependencies"

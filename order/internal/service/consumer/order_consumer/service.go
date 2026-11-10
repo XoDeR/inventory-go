@@ -19,12 +19,18 @@ var _ def.OrderConsumerService = (*service)(nil)
 type service struct {
 	computerAssembledConsumer kafka.Consumer
 	orderRepository           repository.OrderRepository
+	orderCacheRepository      repository.OrderCacheRepository
 }
 
-func NewService(computerAssembledConsumer kafka.Consumer, orderRepository repository.OrderRepository) *service {
+func NewService(
+	computerAssembledConsumer kafka.Consumer,
+	orderRepository repository.OrderRepository,
+	orderCacheRepository repository.OrderCacheRepository,
+) *service {
 	return &service{
 		computerAssembledConsumer: computerAssembledConsumer,
 		orderRepository:           orderRepository,
+		orderCacheRepository:      orderCacheRepository,
 	}
 }
 
@@ -65,6 +71,11 @@ func (s *service) ComputerAssembledHandler(ctx context.Context, msg kafka.Messag
 
 	if err = s.orderRepository.Update(ctx, order); err != nil {
 		return err
+	}
+
+	// the cached order still has the old status; a cache failure is only logged, the entry expires by its TTL
+	if err = s.orderCacheRepository.Delete(ctx, orderUUID.String()); err != nil {
+		logger.Error(ctx, "failed to invalidate the cached order", "order_uuid", orderUUID, "error", err)
 	}
 
 	logger.Info(ctx, "Order completed", "order_uuid", orderUUID, "event_uuid", event.EventUUID)

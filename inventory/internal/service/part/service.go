@@ -1,6 +1,8 @@
 package part
 
 import (
+	"time"
+
 	"inventory-go/inventory/internal/repository"
 	def "inventory-go/inventory/internal/service"
 )
@@ -8,11 +10,19 @@ import (
 var _ def.InventoryService = (*service)(nil)
 
 type service struct {
-	inventoryRepository repository.InventoryRepository
+	inventoryRepository      repository.InventoryRepository
+	inventoryCacheRepository repository.InventoryCacheRepository
+	cacheTTL                 time.Duration
 }
 
-func NewService(inventoryRepository repository.InventoryRepository) *service {
+func NewService(
+	inventoryRepository repository.InventoryRepository,
+	inventoryCacheRepository repository.InventoryCacheRepository,
+	cacheTTL time.Duration,
+) *service {
 	return &service{
-		inventoryRepository: inventoryRepository,
+		inventoryRepository:      inventoryRepository,
+		inventoryCacheRepository: inventoryCacheRepository,
+		cacheTTL:                 cacheTTL,
 	}
 }

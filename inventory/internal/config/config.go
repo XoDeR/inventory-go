@@ -15,6 +15,7 @@ type config struct {
 	GRPC   InventoryGRPCConfig
 	HTTP   InventoryHTTPConfig
 	Mongo  MongoConfig
+	Redis  RedisConfig
 }
 
 // Load reads the given .env files (a missing file is not an error, the process
@@ -40,6 +41,11 @@ func Load(path ...string) error {
 		return err
 	}
 
+	redisCfg, err := env.NewRedisConfig()
+	if err != nil {
+		return err
+	}
+
 	loggerCfg, err := env.NewLoggerConfig()
 	if err != nil {
 		return err
@@ -50,6 +56,7 @@ func Load(path ...string) error {
 		GRPC:   grpcCfg,
 		HTTP:   httpCfg,
 		Mongo:  mongoCfg,
+		Redis:  redisCfg,
 	}
 
 	return nil

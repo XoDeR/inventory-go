@@ -27,6 +27,7 @@ func (s *ServiceSuite) TestCancelSuccess() {
 
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
 	s.orderRepository.EXPECT().Update(ctx, cancelledOrder).Return(nil)
+	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(nil)
 
 	err := s.service.Cancel(ctx, orderUUID)
 
@@ -78,4 +79,22 @@ func (s *ServiceSuite) TestCancelUpdateError() {
 	err := s.service.Cancel(ctx, orderUUID)
 
 	s.Require().ErrorIs(err, repoErr)
+}
+
+func (s *ServiceSuite) TestCancelCacheInvalidationFailureIsIgnored() {
+	var (
+		ctx       = context.Background()
+		orderUUID = uuid.New()
+
+		storedOrder = model.Order{Uuid: orderUUID, Status: model.OrderStatusPendingPayment}
+
+		cancelledOrder = storedOrder
+	)
+	cancelledOrder.Status = model.OrderStatusCancelled
+
+	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
+	s.orderRepository.EXPECT().Update(ctx, cancelledOrder).Return(nil)
+	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(errors.New("redis is down"))
+
+	s.Require().NoError(s.service.Cancel(ctx, orderUUID))
 }

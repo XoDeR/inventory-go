@@ -22,6 +22,23 @@ services:
     networks:
       - microservices-net
 
+  redis-inventory:
+    # Cache. Image and ports come from the generated .env (task env:generate)
+    image: ${REDIS_IMAGE_NAME}
+    container_name: redis-inventory
+    env_file:
+      - .env
+    ports:
+      - "${EXTERNAL_REDIS_PORT}:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - microservices-net
+
 volumes:
   mongo_inventory_data:
 

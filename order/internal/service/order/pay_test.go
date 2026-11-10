@@ -40,6 +40,7 @@ func (s *ServiceSuite) TestPaySuccess() {
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
 	s.paymentClient.EXPECT().PayOrder(ctx, payInfo).Return(transactionID.String(), nil)
 	s.orderRepository.EXPECT().Update(ctx, paidOrder).Return(nil)
+	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(nil)
 	s.orderProducer.EXPECT().ProduceOrderPaid(ctx, mock.MatchedBy(func(e model.OrderPaidEvent) bool {
 		return e.OrderUUID == orderUUID && e.UserUUID == userUUID && e.TransactionUUID == transactionID && e.PaymentMethod == method
 	})).Return(nil)
@@ -151,6 +152,7 @@ func (s *ServiceSuite) TestPayProducerErrorIsIgnored() {
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
 	s.paymentClient.EXPECT().PayOrder(ctx, mock.Anything).Return(transactionID.String(), nil)
 	s.orderRepository.EXPECT().Update(ctx, mock.Anything).Return(nil)
+	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(nil)
 	s.orderProducer.EXPECT().ProduceOrderPaid(ctx, mock.Anything).Return(errors.New("kafka is down"))
 
 	result, err := s.service.Pay(ctx, orderUUID, method)

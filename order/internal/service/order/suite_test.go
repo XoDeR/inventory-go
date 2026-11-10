@@ -2,6 +2,7 @@ package order
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/suite"
 
@@ -10,10 +11,13 @@ import (
 	serviceMocks "inventory-go/order/internal/service/mocks"
 )
 
+const testCacheTTL = time.Hour
+
 type ServiceSuite struct {
 	suite.Suite
 
-	orderRepository *repoMocks.OrderRepository
+	orderRepository      *repoMocks.OrderRepository
+	orderCacheRepository *repoMocks.OrderCacheRepository
 
 	inventoryClient *grpcMocks.InventoryClient
 	paymentClient   *grpcMocks.PaymentClient
@@ -26,12 +30,13 @@ type ServiceSuite struct {
 // and no expectations or call counts leak between tests.
 func (s *ServiceSuite) SetupTest() {
 	s.orderRepository = repoMocks.NewOrderRepository(s.T())
+	s.orderCacheRepository = repoMocks.NewOrderCacheRepository(s.T())
 
 	s.inventoryClient = grpcMocks.NewInventoryClient(s.T())
 	s.paymentClient = grpcMocks.NewPaymentClient(s.T())
 	s.orderProducer = serviceMocks.NewOrderProducerService(s.T())
 
-	s.service = NewService(s.orderRepository, s.inventoryClient, s.paymentClient, s.orderProducer)
+	s.service = NewService(s.orderRepository, s.orderCacheRepository, testCacheTTL, s.inventoryClient, s.paymentClient, s.orderProducer)
 }
 
 func TestServiceSuite(t *testing.T) {

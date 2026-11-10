@@ -24,6 +24,14 @@ const (
 	mongoAuthDB   = "admin"
 	mongoPort     = "27017"
 
+	redisName              = "e2e-inventory-redis"
+	redisImage             = "redis:7.2.5-alpine3.20"
+	redisPort              = "6379"
+	redisConnectionTimeout = "5s"
+	redisMaxIdle           = "10"
+	redisIdleTimeout       = "240s"
+	redisCacheTTL          = "1h"
+
 	// ports the app listens on inside its container
 	grpcPort = "50051"
 	httpPort = "8081"

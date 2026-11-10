@@ -17,6 +17,7 @@ import (
 	"inventory-go/platform/pkg/testcontainers/network"
 	"inventory-go/platform/pkg/testcontainers/path"
 	"inventory-go/platform/pkg/testcontainers/postgres"
+	"inventory-go/platform/pkg/testcontainers/redis"
 )
 
 const (
@@ -67,6 +68,16 @@ const (
 	mongoAuthDB   = "admin"
 	mongoPort     = "27017"
 
+	// Redis shared by the inventory and order caches (their keys have different prefixes)
+	redisName  = "e2e-order-redis"
+	redisImage = "redis:7.2.5-alpine3.20"
+	redisPort  = "6379"
+
+	redisConnectionTimeout = "5s"
+	redisMaxIdle           = "10"
+	redisIdleTimeout       = "240s"
+	redisCacheTTL          = "1h"
+
 	loggerLevelValue = "debug"
 	startupTimeout   = 3 * time.Minute
 	testsTimeout     = 15 * time.Minute
@@ -78,6 +89,7 @@ type TestEnvironment struct {
 	Postgres  *postgres.Container
 	Kafka     *kafka.Container
 	Mongo     *mongo.Container
+	Redis     *redis.Container
 	Inventory *app.Container
 	Payment   *app.Container
 	Assembly  *app.Container
@@ -139,6 +151,16 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		return fail("failed to start the MongoDB container", err)
 	}
 
+	env.Redis, err = redis.NewContainer(ctx,
+		redis.WithNetworkName(env.Network.Name()),
+		redis.WithContainerName(redisName),
+		redis.WithImageName(redisImage),
+		redis.WithLogger(logger.Default()),
+	)
+	if err != nil {
+		return fail("failed to start the Redis container", err)
+	}
+
 	env.Inventory, err = startService(ctx, env.Network.Name(), "inventory", "grpc_server", inventoryAppName, inventoryGRPC, map[string]string{
 		"GRPC_HOST": "0.0.0.0",
 		"GRPC_PORT": inventoryGRPC,
@@ -151,6 +173,13 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"MONGO_INITDB_ROOT_USERNAME": mongoUser,
 		"MONGO_INITDB_ROOT_PASSWORD": mongoPassword,
 		"MONGO_AUTH_DB":              mongoAuthDB,
+
+		"REDIS_HOST":               redisName,
+		"REDIS_PORT":               redisPort,
+		"REDIS_CONNECTION_TIMEOUT": redisConnectionTimeout,
+		"REDIS_MAX_IDLE":           redisMaxIdle,
+		"REDIS_IDLE_TIMEOUT":       redisIdleTimeout,
+		"REDIS_CACHE_TTL":          redisCacheTTL,
 	})
 	if err != nil {
 		return fail("failed to start the inventory service", err)
@@ -207,6 +236,13 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"POSTGRES_DB":       postgresDatabase,
 		"POSTGRES_USER":     postgresUser,
 		"POSTGRES_PASSWORD": postgresPassword,
+
+		"REDIS_HOST":               redisName,
+		"REDIS_PORT":               redisPort,
+		"REDIS_CONNECTION_TIMEOUT": redisConnectionTimeout,
+		"REDIS_MAX_IDLE":           redisMaxIdle,
+		"REDIS_IDLE_TIMEOUT":       redisIdleTimeout,
+		"REDIS_CACHE_TTL":          redisCacheTTL,
 
 		"KAFKA_BROKERS":                     env.Kafka.Address(),
 		"ORDER_PAID_TOPIC_NAME":             orderPaidTopic,
@@ -272,6 +308,12 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 	if env.Kafka != nil {
 		if err := env.Kafka.Terminate(ctx); err != nil {
 			logger.Error(ctx, "failed to stop the Kafka container", "error", err)
+		}
+	}
+
+	if env.Redis != nil {
+		if err := env.Redis.Terminate(ctx); err != nil {
+			logger.Error(ctx, "failed to stop the Redis container", "error", err)
 		}
 	}
 

@@ -33,10 +33,12 @@ func TestHandlerCompletesPaidOrder(t *testing.T) {
 	ctx := context.Background()
 	orderUUID := uuid.New()
 	repo := repoMocks.NewOrderRepository(t)
-	s := NewService(nil, repo)
+	cacheRepo := repoMocks.NewOrderCacheRepository(t)
+	s := NewService(nil, repo, cacheRepo)
 
 	repo.EXPECT().Get(ctx, orderUUID.String()).Return(model.Order{Uuid: orderUUID, Status: model.OrderStatusPaid}, nil)
 	repo.EXPECT().Update(ctx, model.Order{Uuid: orderUUID, Status: model.OrderStatusCompleted}).Return(nil)
+	cacheRepo.EXPECT().Delete(ctx, orderUUID.String()).Return(nil)
 
 	require.NoError(t, s.ComputerAssembledHandler(ctx, newMessage(t, orderUUID)))
 }
@@ -45,7 +47,8 @@ func TestHandlerIsIdempotent(t *testing.T) {
 	ctx := context.Background()
 	orderUUID := uuid.New()
 	repo := repoMocks.NewOrderRepository(t)
-	s := NewService(nil, repo)
+	cacheRepo := repoMocks.NewOrderCacheRepository(t)
+	s := NewService(nil, repo, cacheRepo)
 
 	// no Update expectation: an already completed order is left untouched
 	repo.EXPECT().Get(ctx, orderUUID.String()).Return(model.Order{Uuid: orderUUID, Status: model.OrderStatusCompleted}, nil)
@@ -57,7 +60,8 @@ func TestHandlerRejectsUnpaidOrder(t *testing.T) {
 	ctx := context.Background()
 	orderUUID := uuid.New()
 	repo := repoMocks.NewOrderRepository(t)
-	s := NewService(nil, repo)
+	cacheRepo := repoMocks.NewOrderCacheRepository(t)
+	s := NewService(nil, repo, cacheRepo)
 
 	repo.EXPECT().Get(ctx, orderUUID.String()).Return(model.Order{Uuid: orderUUID, Status: model.OrderStatusPendingPayment}, nil)
 
@@ -67,7 +71,8 @@ func TestHandlerRejectsUnpaidOrder(t *testing.T) {
 func TestHandlerRepositoryError(t *testing.T) {
 	ctx := context.Background()
 	repo := repoMocks.NewOrderRepository(t)
-	s := NewService(nil, repo)
+	cacheRepo := repoMocks.NewOrderCacheRepository(t)
+	s := NewService(nil, repo, cacheRepo)
 	repoErr := errors.New("db is down")
 
 	repo.EXPECT().Get(ctx, mock.Anything).Return(model.Order{}, repoErr)
@@ -76,7 +81,7 @@ func TestHandlerRepositoryError(t *testing.T) {
 }
 
 func TestHandlerInvalidPayload(t *testing.T) {
-	s := NewService(nil, repoMocks.NewOrderRepository(t))
+	s := NewService(nil, repoMocks.NewOrderRepository(t), repoMocks.NewOrderCacheRepository(t))
 
 	require.Error(t, s.ComputerAssembledHandler(context.Background(), kafka.Message{Value: []byte("not json")}))
 }

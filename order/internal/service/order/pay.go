@@ -37,6 +37,8 @@ func (s *service) Pay(ctx context.Context, orderUUID uuid.UUID, method model.Pay
 		return uuid.Nil, err
 	}
 
+	s.invalidateCache(ctx, orderUUID.String())
+
 	// The payment is already done and saved, so a Kafka failure must not fail the request:
 	// it is logged and the order stays PAID (there is no outbox yet to retry the publication).
 	err = s.orderProducer.ProduceOrderPaid(ctx, model.OrderPaidEvent{

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/IBM/sarama"
+	redigo "github.com/gomodule/redigo/redis"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -16,10 +17,13 @@ import (
 	"inventory-go/order/internal/config"
 	"inventory-go/order/internal/repository"
 	orderRepository "inventory-go/order/internal/repository/order"
+	orderCacheRepository "inventory-go/order/internal/repository/order_cache"
 	"inventory-go/order/internal/service"
 	consumerService "inventory-go/order/internal/service/consumer/order_consumer"
 	orderService "inventory-go/order/internal/service/order"
 	producerService "inventory-go/order/internal/service/producer/order_producer"
+	"inventory-go/platform/pkg/cache"
+	cacheRedis "inventory-go/platform/pkg/cache/redis"
 	"inventory-go/platform/pkg/closer"
 	"inventory-go/platform/pkg/kafka"
 	kafkaConsumer "inventory-go/platform/pkg/kafka/consumer"
@@ -47,7 +51,11 @@ type diContainer struct {
 	consumerGroup sarama.ConsumerGroup
 	syncProducer  sarama.SyncProducer
 
-	orderRepository repository.OrderRepository
+	orderRepository      repository.OrderRepository
+	orderCacheRepository repository.OrderCacheRepository
+
+	redisPool   *redigo.Pool
+	redisClient cache.RedisClient
 
 	inventoryClient grpcClient.InventoryClient
 	paymentClient   grpcClient.PaymentClient
@@ -74,6 +82,8 @@ func (d *diContainer) OrderService(ctx context.Context) service.OrderService {
 	if d.orderService == nil {
 		d.orderService = orderService.NewService(
 			d.OrderRepository(ctx),
+			d.OrderCacheRepository(ctx),
+			config.AppConfig().Redis.CacheTTL(),
 			d.InventoryClient(ctx),
 			d.PaymentClient(ctx),
 			d.OrderProducerService(ctx),
@@ -180,7 +190,7 @@ func (d *diContainer) OrderProducerService(ctx context.Context) service.OrderPro
 
 func (d *diContainer) OrderConsumerService(ctx context.Context) service.OrderConsumerService {
 	if d.orderConsumerService == nil {
-		d.orderConsumerService = consumerService.NewService(d.ComputerAssembledConsumer(), d.OrderRepository(ctx))
+		d.orderConsumerService = consumerService.NewService(d.ComputerAssembledConsumer(), d.OrderRepository(ctx), d.OrderCacheRepository(ctx))
 	}
 
 	return d.orderConsumerService
@@ -246,4 +256,38 @@ func (d *diContainer) SyncProducer() sarama.SyncProducer {
 	}
 
 	return d.syncProducer
+}
+
+func (d *diContainer) OrderCacheRepository(ctx context.Context) repository.OrderCacheRepository {
+	if d.orderCacheRepository == nil {
+		d.orderCacheRepository = orderCacheRepository.NewRepository(d.RedisClient(ctx))
+	}
+
+	return d.orderCacheRepository
+}
+
+func (d *diContainer) RedisPool() *redigo.Pool {
+	if d.redisPool == nil {
+		cfg := config.AppConfig().Redis
+
+		pool := cacheRedis.NewPool(cfg.Address(), cfg.MaxIdle(), cfg.IdleTimeout(), cfg.ConnectionTimeout())
+
+		closer.AddNamed("Redis pool", func(_ context.Context) error {
+			return pool.Close()
+		})
+
+		d.redisPool = pool
+	}
+
+	return d.redisPool
+}
+
+// RedisClient does not ping Redis on start: the cache is optional, the service must start
+// and work (from PostgreSQL) even when Redis is down.
+func (d *diContainer) RedisClient(_ context.Context) cache.RedisClient {
+	if d.redisClient == nil {
+		d.redisClient = cacheRedis.NewClient(d.RedisPool(), logger.Default(), config.AppConfig().Redis.ConnectionTimeout())
+	}
+
+	return d.redisClient
 }
