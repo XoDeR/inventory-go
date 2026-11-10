@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package jwt.v1;
+
+option go_package = "inventory-go/shared/pkg/proto/jwt/v1;jwt_v1";
+
+import "google/protobuf/timestamp.proto";
+
+// JWT service for authentication
+service JWTService {
+  // User login
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Get a new access token using a refresh token
+  rpc GetAccessToken(GetAccessTokenRequest) returns (GetAccessTokenResponse);
+
+  // Get a new refresh token
+  rpc GetRefreshToken(GetRefreshTokenRequest) returns (GetRefreshTokenResponse);
+}
+
+// Login request
+message LoginRequest {
+  string username = 1;
+  string password = 2;
+}
+
+// Login response
+message LoginResponse {
+  string access_token = 1;
+  string refresh_token = 2;
+  google.protobuf.Timestamp access_token_expires_at = 3;
+  google.protobuf.Timestamp refresh_token_expires_at = 4;
+}
+
+// Request to get an access token
+message GetAccessTokenRequest {
+  string refresh_token = 1;
+}
+
+// Response with a new access token
+message GetAccessTokenResponse {
+  string access_token = 1;
+  google.protobuf.Timestamp access_token_expires_at = 2;
+}
+
+// Request to get a refresh token
+message GetRefreshTokenRequest {
+  string refresh_token = 1;
+}
+
+// Response with a new refresh token
+message GetRefreshTokenResponse {
+  string refresh_token = 1;
+  google.protobuf.Timestamp refresh_token_expires_at = 2;
+}

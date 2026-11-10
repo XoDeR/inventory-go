@@ -1,0 +1,95 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "jwt/v1/jwt.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "JWTService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {},
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1GetAccessTokenResponse": {
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "type": "string"
+        },
+        "access_token_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "Response with a new access token"
+    },
+    "v1GetRefreshTokenResponse": {
+      "type": "object",
+      "properties": {
+        "refresh_token": {
+          "type": "string"
+        },
+        "refresh_token_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "Response with a new refresh token"
+    },
+    "v1LoginResponse": {
+      "type": "object",
+      "properties": {
+        "access_token": {
+          "type": "string"
+        },
+        "refresh_token": {
+          "type": "string"
+        },
+        "access_token_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "refresh_token_expires_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "title": "Login response"
+    }
+  }
+}
