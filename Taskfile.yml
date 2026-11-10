@@ -19,8 +19,8 @@ vars:
   GRPCURL_VERSION: 'v1.9.4'
   MOCKERY_VERSION: 'v2.53.8'
 
-  MODULES: inventory order payment assembly notification platform shared
-  COVERAGE_MODULES: inventory order payment assembly notification
+  MODULES: inventory order payment assembly notification auth platform shared
+  COVERAGE_MODULES: inventory order payment assembly notification auth
   COVERAGE_DIR: '{{.ROOT_DIR}}/.coverage'
   BIN_DIR: '{{.ROOT_DIR}}/bin'
   GOFUMPT: '{{.BIN_DIR}}/gofumpt{{exeExt}}'
@@ -38,7 +38,7 @@ vars:
   MOCKERY: '{{.BIN_DIR}}/mockery{{exeExt}}'
   ENVSUBST: '{{.BIN_DIR}}/envsubst{{exeExt}}'
   ENVDIR: '{{.ROOT_DIR}}/deploy/env'
-  SERVICES: core,inventory,order,payment,assembly,notification
+  SERVICES: core,inventory,order,payment,assembly,notification,auth
 
   NODE_MODULES_DIR: '{{.ROOT_DIR}}/node_modules/.bin'
   REDOCLY: '{{.NODE_MODULES_DIR}}/redocly{{if eq OS "windows"}}.cmd{{end}}'
@@ -662,16 +662,33 @@ tasks:
       - echo "[task] 🛑 Stopping Inventory Service dependencies"
       - docker compose down --volumes
 
+  up-auth:
+    deps: [ env:generate ]
+    desc: "Starts Auth Service dependencies (PostgreSQL, Redis)"
+    dir: deploy/compose/auth
+    cmds:
+      - echo "[task] 📦 Starting Auth Service dependencies"
+      - docker compose up --build --detach
+
+  down-auth:
+    desc: "Stops and removes Auth Service dependencies (PostgreSQL, Redis)"
+    dir: deploy/compose/auth
+    cmds:
+      - echo "[task] 🛑 Stopping Auth Service dependencies"
+      - docker compose down --volumes
+
   up-all:
-    desc: "Starts all compose parts in order: core, order, inventory"
+    desc: "Starts all compose parts in order: core, order, inventory, auth"
     cmds:
       - task: up-core
       - task: up-order
       - task: up-inventory
+      - task: up-auth
 
   down-all:
     desc: "Stops and removes all compose parts in reverse order (the network goes last)"
     cmds:
+      - task: down-auth
       - task: down-inventory
       - task: down-order
       - task: down-core
@@ -684,6 +701,7 @@ tasks:
       - go build -o {{.BIN_DIR}}/services/order{{exeExt}} ./order/cmd/http_server
       - go build -o {{.BIN_DIR}}/services/assembly{{exeExt}} ./assembly/cmd/consumer
       - go build -o {{.BIN_DIR}}/services/notification{{exeExt}} ./notification/cmd/consumer
+      - go build -o {{.BIN_DIR}}/services/auth{{exeExt}} ./auth/cmd/grpc_server
 
   run:inventory:
     desc: "Runs the Inventory service"
@@ -715,9 +733,15 @@ tasks:
     cmds:
       - '{{.BIN_DIR}}/services/notification{{exeExt}}'
 
+  run:auth:
+    desc: "Runs the Auth service"
+    deps: [ run:build ]
+    cmds:
+      - '{{.BIN_DIR}}/services/auth{{exeExt}}'
+
   run-all:
-    desc: "Builds and runs all five services in one terminal (Ctrl+C stops them). Needs the infrastructure: task up-all"
-    deps: [ run:inventory, run:payment, run:order, run:assembly, run:notification ]
+    desc: "Builds and runs all six services in one terminal (Ctrl+C stops them). Needs the infrastructure: task up-all"
+    deps: [ run:inventory, run:payment, run:order, run:assembly, run:notification, run:auth ]
 
   down-core:keep-volumes:
     desc: "Stops and removes the core containers, keeps volumes"
@@ -740,9 +764,17 @@ tasks:
       - echo "[task] 🛑 Stopping Inventory Service dependencies (volumes are kept)"
       - docker compose down
 
+  down-auth:keep-volumes:
+    desc: "Stops and removes Auth Service dependencies, keeps volumes (PostgreSQL data)"
+    dir: deploy/compose/auth
+    cmds:
+      - echo "[task] 🛑 Stopping Auth Service dependencies (volumes are kept)"
+      - docker compose down
+
   down-all:keep-volumes:
     desc: "Stops and removes all compose parts in reverse order, keeps volumes"
     cmds:
+      - task: down-auth:keep-volumes
       - task: down-inventory:keep-volumes
       - task: down-order:keep-volumes
       - task: down-core:keep-volumes

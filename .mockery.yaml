@@ -35,3 +35,9 @@ packages:
   inventory-go/notification/internal/client/notifier:
     config:
       include-regex: "Notifier"
+  inventory-go/auth/internal/service:
+    config:
+      include-regex: ".*Service"
+  inventory-go/auth/internal/repository:
+    config:
+      include-regex: ".*Repository"

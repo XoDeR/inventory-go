@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package auth.v1;
+
+import "validate/validate.proto";
+
+option go_package = "inventory-go/shared/pkg/proto/auth/v1;auth_v1";
+
+// AuthService manages users: registration, login, session validation
+// and retrieval of user information.
+//
+// Authorized calls pass the session UUID obtained from Login in the
+// gRPC metadata under the key "session-uuid".
+service AuthService {
+  // Register creates a new user.
+  rpc Register(RegisterRequest) returns (RegisterResponse);
+
+  // Login checks the credentials and opens a session.
+  rpc Login(LoginRequest) returns (LoginResponse);
+
+  // Whoami returns the user that owns the session.
+  rpc Whoami(WhoamiRequest) returns (WhoamiResponse);
+
+  // GetUser returns a user by UUID.
+  rpc GetUser(GetUserRequest) returns (GetUserResponse);
+}
+
+// NotificationMethod is a channel the user wants to be notified through.
+message NotificationMethod {
+  // Provider name, e.g. "telegram", "email", "push"
+  string provider_name = 1 [(validate.rules).string.min_len = 1];
+  // Recipient address: email, chat ID, etc.
+  string target = 2 [(validate.rules).string.min_len = 1];
+}
+
+// RegisterRequest is the request for AuthService.Register.
+message RegisterRequest {
+  // User login
+  string login = 1 [(validate.rules).string = {min_len: 3, max_len: 64}];
+  // User password
+  string password = 2 [(validate.rules).string = {min_len: 8, max_len: 72}];
+  // User email
+  string email = 3 [(validate.rules).string.email = true];
+  // Channels through which the user wants to be notified
+  repeated NotificationMethod notification_methods = 4;
+}
+
+// RegisterResponse is the response for AuthService.Register.
+message RegisterResponse {
+  // UUID of the registered user
+  string user_uuid = 1;
+}
+
+// LoginRequest is the request for AuthService.Login.
+message LoginRequest {
+  // User login
+  string login = 1 [(validate.rules).string.min_len = 1];
+  // User password
+  string password = 2 [(validate.rules).string.min_len = 1];
+}
+
+// LoginResponse is the response for AuthService.Login.
+message LoginResponse {
+  // Session identifier
+  string session_uuid = 1;
+}
+
+// WhoamiRequest is the request for AuthService.Whoami.
+message WhoamiRequest {
+  // Session identifier
+  string session_uuid = 1 [(validate.rules).string.uuid = true];
+}
+
+// WhoamiResponse is the response for AuthService.Whoami.
+message WhoamiResponse {
+  // User UUID
+  string user_uuid = 1;
+  // User login
+  string login = 2;
+  // User email
+  string email = 3;
+}
+
+// GetUserRequest is the request for AuthService.GetUser.
+message GetUserRequest {
+  // User UUID
+  string user_uuid = 1 [(validate.rules).string.uuid = true];
+}
+
+// GetUserResponse is the response for AuthService.GetUser.
+message GetUserResponse {
+  // User UUID
+  string user_uuid = 1;
+  // User login
+  string login = 2;
+  // User email
+  string email = 3;
+  // The user's notification channels
+  repeated NotificationMethod notification_methods = 4;
+}

@@ -1,0 +1,127 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "title": "auth/v1/auth.proto",
+    "version": "version not set"
+  },
+  "tags": [
+    {
+      "name": "AuthService"
+    }
+  ],
+  "consumes": [
+    "application/json"
+  ],
+  "produces": [
+    "application/json"
+  ],
+  "paths": {},
+  "definitions": {
+    "protobufAny": {
+      "type": "object",
+      "properties": {
+        "@type": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": {}
+    },
+    "rpcStatus": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        },
+        "details": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/protobufAny"
+          }
+        }
+      }
+    },
+    "v1GetUserResponse": {
+      "type": "object",
+      "properties": {
+        "user_uuid": {
+          "type": "string",
+          "title": "User UUID"
+        },
+        "login": {
+          "type": "string",
+          "title": "User login"
+        },
+        "email": {
+          "type": "string",
+          "title": "User email"
+        },
+        "notification_methods": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "$ref": "#/definitions/v1NotificationMethod"
+          },
+          "title": "The user's notification channels"
+        }
+      },
+      "description": "GetUserResponse is the response for AuthService.GetUser."
+    },
+    "v1LoginResponse": {
+      "type": "object",
+      "properties": {
+        "session_uuid": {
+          "type": "string",
+          "title": "Session identifier"
+        }
+      },
+      "description": "LoginResponse is the response for AuthService.Login."
+    },
+    "v1NotificationMethod": {
+      "type": "object",
+      "properties": {
+        "provider_name": {
+          "type": "string",
+          "title": "Provider name, e.g. \"telegram\", \"email\", \"push\""
+        },
+        "target": {
+          "type": "string",
+          "description": "Recipient address: email, chat ID, etc."
+        }
+      },
+      "description": "NotificationMethod is a channel the user wants to be notified through."
+    },
+    "v1RegisterResponse": {
+      "type": "object",
+      "properties": {
+        "user_uuid": {
+          "type": "string",
+          "title": "UUID of the registered user"
+        }
+      },
+      "description": "RegisterResponse is the response for AuthService.Register."
+    },
+    "v1WhoamiResponse": {
+      "type": "object",
+      "properties": {
+        "user_uuid": {
+          "type": "string",
+          "title": "User UUID"
+        },
+        "login": {
+          "type": "string",
+          "title": "User login"
+        },
+        "email": {
+          "type": "string",
+          "title": "User email"
+        }
+      },
+      "description": "WhoamiResponse is the response for AuthService.Whoami."
+    }
+  }
+}
