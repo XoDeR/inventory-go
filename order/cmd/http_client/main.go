@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/brianvoe/gofakeit/v7"
@@ -95,7 +97,7 @@ func main() {
 
 	slog.Info("testing order API")
 
-	client, err := orderV1.NewClient(serverURL)
+	client, err := orderV1.NewClient(serverURL, orderV1.WithClient(sessionHTTPClient(os.Getenv("SESSION_UUID"))))
 	if err != nil {
 		slog.Error("error creating client", "error", err)
 		return
@@ -121,4 +123,23 @@ func main() {
 		return
 	}
 	slog.Info("order fetched", "order", order)
+}
+
+// sessionTransport adds the session header: the order service needs a session, so log in via the
+// auth service and pass SESSION_UUID=<session_uuid>.
+type sessionTransport struct {
+	sessionUUID string
+}
+
+func (t sessionTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	if t.sessionUUID != "" {
+		r.Header.Set("X-Session-Uuid", t.sessionUUID)
+	}
+
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+func sessionHTTPClient(sessionUUID string) *http.Client {
+	return &http.Client{Transport: sessionTransport{sessionUUID: sessionUUID}}
 }

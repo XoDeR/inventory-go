@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -13,17 +12,18 @@ import (
 
 func (s *APISuite) TestCreateOrderSuccess() {
 	var (
-		ctx = context.Background()
+		ctx = s.authCtx()
 
-		userUUID = uuid.New()
 		partUUID = uuid.New()
 
-		req = &orderV1.CreateOrderRequest{UserUUID: userUUID, PartUuids: []uuid.UUID{partUUID}}
+		// the body names another user: it must be ignored in favour of the authenticated one
+		req = &orderV1.CreateOrderRequest{UserUUID: uuid.New(), PartUuids: []uuid.UUID{partUUID}}
 
-		// The request must be converted to the model before it reaches the service.
-		expectedInfo = model.CreateOrderInfo{UserUuid: userUUID, PartUuids: []uuid.UUID{partUUID}}
+		// The request must be converted to the model before it reaches the service,
+		// with the user of the session.
+		expectedInfo = model.CreateOrderInfo{UserUuid: s.userUUID, PartUuids: []uuid.UUID{partUUID}}
 
-		order = model.Order{Uuid: uuid.New(), UserUuid: userUUID, TotalPrice: 1999.99}
+		order = model.Order{Uuid: uuid.New(), UserUuid: s.userUUID, TotalPrice: 1999.99}
 	)
 
 	s.orderService.EXPECT().Create(ctx, expectedInfo).Return(order, nil)
@@ -40,10 +40,10 @@ func (s *APISuite) TestCreateOrderBadRequest() {
 		"parts not found":  model.ErrPartsNotFound,
 	} {
 		s.Run(name, func() {
-			ctx := context.Background()
+			ctx := s.authCtx()
 			req := &orderV1.CreateOrderRequest{UserUUID: uuid.New()}
 
-			s.orderService.EXPECT().Create(ctx, model.CreateOrderInfo{UserUuid: req.UserUUID}).
+			s.orderService.EXPECT().Create(ctx, model.CreateOrderInfo{UserUuid: s.userUUID}).
 				Return(model.Order{}, serviceErr).Once()
 
 			res, err := s.api.CreateOrder(ctx, req)
@@ -59,12 +59,12 @@ func (s *APISuite) TestCreateOrderBadRequest() {
 
 func (s *APISuite) TestCreateOrderServiceError() {
 	var (
-		ctx        = context.Background()
+		ctx        = s.authCtx()
 		req        = &orderV1.CreateOrderRequest{UserUUID: uuid.New()}
 		serviceErr = errors.New("database is unavailable")
 	)
 
-	s.orderService.EXPECT().Create(ctx, model.CreateOrderInfo{UserUuid: req.UserUUID}).Return(model.Order{}, serviceErr)
+	s.orderService.EXPECT().Create(ctx, model.CreateOrderInfo{UserUuid: s.userUUID}).Return(model.Order{}, serviceErr)
 
 	res, err := s.api.CreateOrder(ctx, req)
 

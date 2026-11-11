@@ -9,9 +9,13 @@ import (
 	"inventory-go/platform/pkg/logger"
 )
 
-func (s *service) Pay(ctx context.Context, orderUUID uuid.UUID, method model.PaymentMethod) (uuid.UUID, error) {
+func (s *service) Pay(ctx context.Context, orderUUID, userUUID uuid.UUID, method model.PaymentMethod) (uuid.UUID, error) {
 	order, err := s.orderRepository.Get(ctx, orderUUID.String())
 	if err != nil {
+		return uuid.Nil, err
+	}
+
+	if order, err = ownedBy(order, userUUID); err != nil {
 		return uuid.Nil, err
 	}
 

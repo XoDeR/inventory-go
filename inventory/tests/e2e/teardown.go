@@ -27,6 +27,10 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 		}
 	}
 
+	if env.Auth != nil {
+		env.Auth.Terminate(ctx)
+	}
+
 	if env.Redis != nil {
 		if err := env.Redis.Terminate(ctx); err != nil {
 			logger.Error(ctx, "failed to stop the Redis container", "error", err)

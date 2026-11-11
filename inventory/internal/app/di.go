@@ -9,6 +9,8 @@ import (
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 	"go.mongodb.org/mongo-driver/v2/mongo/readpref"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	inventoryV1API "inventory-go/inventory/internal/api/inventory/v1"
 	"inventory-go/inventory/internal/config"
@@ -21,6 +23,7 @@ import (
 	cacheRedis "inventory-go/platform/pkg/cache/redis"
 	"inventory-go/platform/pkg/closer"
 	"inventory-go/platform/pkg/logger"
+	authV1 "inventory-go/shared/pkg/proto/auth/v1"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 
@@ -41,6 +44,8 @@ type diContainer struct {
 
 	mongoDBClient *mongo.Client
 	mongoDBHandle *mongo.Database
+
+	authClient authV1.AuthServiceClient
 }
 
 func NewDiContainer() *diContainer {
@@ -144,4 +149,27 @@ func (d *diContainer) RedisClient(_ context.Context) cache.RedisClient {
 	}
 
 	return d.redisClient
+}
+
+// AuthClient is the client of the auth service, used by the auth interceptor to check sessions.
+// The connection is lazy: the service starts even when auth is not up yet, and requests are
+// rejected as unauthenticated until it is.
+func (d *diContainer) AuthClient(_ context.Context) authV1.AuthServiceClient {
+	if d.authClient == nil {
+		conn, err := grpc.NewClient(
+			config.AppConfig().Auth.Address(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			panic(fmt.Sprintf("failed to connect to auth: %v", err))
+		}
+
+		closer.AddNamed("auth gRPC connection", func(_ context.Context) error {
+			return conn.Close()
+		})
+
+		d.authClient = authV1.NewAuthServiceClient(conn)
+	}
+
+	return d.authClient
 }

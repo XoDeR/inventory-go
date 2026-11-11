@@ -16,6 +16,8 @@ import (
 	"inventory-go/platform/pkg/closer"
 	"inventory-go/platform/pkg/grpc/health"
 	"inventory-go/platform/pkg/logger"
+	grpcAuth "inventory-go/platform/pkg/middleware/grpc"
+	httpAuth "inventory-go/platform/pkg/middleware/http"
 	"inventory-go/shared/api/swagger"
 	"inventory-go/shared/pkg/interceptor"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
@@ -114,7 +116,10 @@ func (a *App) initListener(_ context.Context) error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	a.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(interceptor.UnaryValidate()))
+	a.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(
+		grpcAuth.NewAuthInterceptor(a.diContainer.AuthClient(ctx)).Unary(),
+		interceptor.UnaryValidate(),
+	))
 
 	closer.AddNamed("gRPC server", func(_ context.Context) error {
 		a.grpcServer.GracefulStop()
@@ -133,7 +138,9 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 
 // initHTTPServer builds the HTTP gateway (REST -> gRPC) with the Swagger UI.
 func (a *App) initHTTPServer(ctx context.Context) error {
-	gwMux := runtime.NewServeMux()
+	gwMux := runtime.NewServeMux(
+		runtime.WithIncomingHeaderMatcher(grpcAuth.GatewayHeaderMatcher(httpAuth.SessionUUIDHeader)),
+	)
 
 	err := inventoryV1.RegisterInventoryServiceHandlerFromEndpoint(
 		ctx,

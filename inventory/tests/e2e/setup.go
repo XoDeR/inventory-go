@@ -11,6 +11,7 @@ import (
 
 	"inventory-go/platform/pkg/logger"
 	"inventory-go/platform/pkg/testcontainers/app"
+	"inventory-go/platform/pkg/testcontainers/authstack"
 	"inventory-go/platform/pkg/testcontainers/mongo"
 	"inventory-go/platform/pkg/testcontainers/network"
 	"inventory-go/platform/pkg/testcontainers/path"
@@ -22,6 +23,7 @@ type TestEnvironment struct {
 	Network *network.Network
 	Mongo   *mongo.Container
 	Redis   *redis.Container
+	Auth    *authstack.Stack
 	App     *app.Container
 }
 
@@ -65,6 +67,14 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 	}
 	logger.Info(ctx, "Redis container started")
 
+	// Step 2.2: start the auth service (the inventory service validates sessions against it)
+	generatedAuth, err := authstack.Start(ctx, generatedNetwork.Name(), projectName)
+	if err != nil {
+		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork, Mongo: generatedMongo, Redis: generatedRedis})
+		return nil, fmt.Errorf("failed to start the auth service: %w", err)
+	}
+	logger.Info(ctx, "Auth service started")
+
 	// Step 3: build and start the service
 	appEnv := map[string]string{
 		"GRPC_HOST": "0.0.0.0",
@@ -89,6 +99,9 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"REDIS_MAX_IDLE":           redisMaxIdle,
 		"REDIS_IDLE_TIMEOUT":       redisIdleTimeout,
 		"REDIS_CACHE_TTL":          redisCacheTTL,
+
+		"AUTH_GRPC_HOST": generatedAuth.Host,
+		"AUTH_GRPC_PORT": authstack.GRPCPort,
 	}
 
 	waitStrategy := wait.ForListeningPort(grpcPort + "/tcp").WithStartupTimeout(startupTimeout)
@@ -106,7 +119,7 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		app.WithLogger(logger.Default()),
 	)
 	if err != nil {
-		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork, Mongo: generatedMongo, Redis: generatedRedis})
+		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork, Mongo: generatedMongo, Redis: generatedRedis, Auth: generatedAuth})
 		return nil, fmt.Errorf("failed to start the app container: %w", err)
 	}
 	logger.Info(ctx, "App container started")
@@ -117,6 +130,7 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		Network: generatedNetwork,
 		Mongo:   generatedMongo,
 		Redis:   generatedRedis,
+		Auth:    generatedAuth,
 		App:     appContainer,
 	}, nil
 }

@@ -12,6 +12,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
@@ -28,7 +29,12 @@ var _ = Describe("PaymentService", func() {
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(suiteCtx)
 
-		var err error
+		// every payment call needs a session, so all calls made with ctx are authenticated
+		user, err := env.Auth.NewUser(suiteCtx)
+		Expect(err).ToNot(HaveOccurred(), "expected to register a user")
+
+		ctx = metadata.AppendToOutgoingContext(ctx, "session-uuid", user.SessionUUID)
+
 		conn, err = grpc.NewClient(
 			env.App.Address(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -83,6 +89,28 @@ var _ = Describe("PaymentService", func() {
 
 			Expect(err).To(HaveOccurred())
 			Expect(status.Code(err)).To(Equal(codes.InvalidArgument))
+		})
+
+		It("rejects a call without a session", func() {
+			_, err := paymentClient.PayOrder(suiteCtx, &paymentV1.PayOrderRequest{
+				OrderUuid:     uuid.NewString(),
+				UserUuid:      uuid.NewString(),
+				PaymentMethod: paymentV1.PaymentMethod_PAYMENT_METHOD_CARD,
+			})
+
+			Expect(status.Code(err)).To(Equal(codes.Unauthenticated))
+		})
+
+		It("rejects a call with an unknown session", func() {
+			badCtx := metadata.AppendToOutgoingContext(suiteCtx, "session-uuid", uuid.NewString())
+
+			_, err := paymentClient.PayOrder(badCtx, &paymentV1.PayOrderRequest{
+				OrderUuid:     uuid.NewString(),
+				UserUuid:      uuid.NewString(),
+				PaymentMethod: paymentV1.PaymentMethod_PAYMENT_METHOD_CARD,
+			})
+
+			Expect(status.Code(err)).To(Equal(codes.Unauthenticated))
 		})
 
 		It("rejects an unspecified payment method", func() {

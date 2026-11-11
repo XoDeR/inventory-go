@@ -31,6 +31,7 @@ import (
 	"inventory-go/platform/pkg/logger"
 	kafkaMiddleware "inventory-go/platform/pkg/middleware/kafka"
 	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
+	authV1 "inventory-go/shared/pkg/proto/auth/v1"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
@@ -64,6 +65,8 @@ type diContainer struct {
 	paymentConn   *grpc.ClientConn
 
 	postgresPool *pgxpool.Pool
+
+	authClient authV1.AuthServiceClient
 }
 
 func NewDiContainer() *diContainer {
@@ -290,4 +293,27 @@ func (d *diContainer) RedisClient(_ context.Context) cache.RedisClient {
 	}
 
 	return d.redisClient
+}
+
+// AuthClient is the client of the auth service, used by the HTTP auth middleware to check sessions.
+// The connection is lazy: the service starts even when auth is not up yet, and requests are
+// rejected as unauthenticated until it is.
+func (d *diContainer) AuthClient(_ context.Context) authV1.AuthServiceClient {
+	if d.authClient == nil {
+		conn, err := grpc.NewClient(
+			config.AppConfig().Auth.Address(),
+			grpc.WithTransportCredentials(insecure.NewCredentials()),
+		)
+		if err != nil {
+			panic(fmt.Sprintf("failed to connect to auth: %v", err))
+		}
+
+		closer.AddNamed("auth gRPC connection", func(_ context.Context) error {
+			return conn.Close()
+		})
+
+		d.authClient = authV1.NewAuthServiceClient(conn)
+	}
+
+	return d.authClient
 }

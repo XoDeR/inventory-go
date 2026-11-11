@@ -11,6 +11,7 @@ import (
 var appConfig *config
 
 type config struct {
+	Auth   AuthClientConfig
 	Logger LoggerConfig
 	GRPC   InventoryGRPCConfig
 	HTTP   InventoryHTTPConfig
@@ -46,12 +47,18 @@ func Load(path ...string) error {
 		return err
 	}
 
+	authCfg, err := env.NewAuthClientConfig()
+	if err != nil {
+		return err
+	}
+
 	loggerCfg, err := env.NewLoggerConfig()
 	if err != nil {
 		return err
 	}
 
 	appConfig = &config{
+		Auth:   authCfg,
 		Logger: loggerCfg,
 		GRPC:   grpcCfg,
 		HTTP:   httpCfg,

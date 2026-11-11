@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/stretchr/testify/suite"
 
 	grpcMocks "inventory-go/order/internal/client/grpc/mocks"
@@ -42,3 +43,6 @@ func (s *ServiceSuite) SetupTest() {
 func TestServiceSuite(t *testing.T) {
 	suite.Run(t, new(ServiceSuite))
 }
+
+// testUserUUID is the user who owns the orders of the tests
+var testUserUUID = uuid.New()

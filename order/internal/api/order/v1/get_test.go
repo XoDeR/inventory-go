@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -14,7 +13,7 @@ import (
 
 func (s *APISuite) TestGetOrderByUuidSuccess() {
 	var (
-		ctx           = context.Background()
+		ctx           = s.authCtx()
 		orderUUID     = uuid.New()
 		transactionID = uuid.New()
 		method        = model.PaymentMethodCard
@@ -30,7 +29,7 @@ func (s *APISuite) TestGetOrderByUuidSuccess() {
 		}
 	)
 
-	s.orderService.EXPECT().Get(ctx, orderUUID).Return(order, nil)
+	s.orderService.EXPECT().Get(ctx, orderUUID, s.userUUID).Return(order, nil)
 
 	res, err := s.api.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: orderUUID})
 
@@ -46,13 +45,13 @@ func (s *APISuite) TestGetOrderByUuidSuccess() {
 
 func (s *APISuite) TestGetOrderByUuidPendingHasNoPaymentInfo() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 
 		order = model.Order{Uuid: orderUUID, Status: model.OrderStatusPendingPayment}
 	)
 
-	s.orderService.EXPECT().Get(ctx, orderUUID).Return(order, nil)
+	s.orderService.EXPECT().Get(ctx, orderUUID, s.userUUID).Return(order, nil)
 
 	res, err := s.api.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: orderUUID})
 
@@ -66,11 +65,11 @@ func (s *APISuite) TestGetOrderByUuidPendingHasNoPaymentInfo() {
 
 func (s *APISuite) TestGetOrderByUuidNotFound() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 	)
 
-	s.orderService.EXPECT().Get(ctx, orderUUID).Return(model.Order{}, model.ErrOrderNotFound)
+	s.orderService.EXPECT().Get(ctx, orderUUID, s.userUUID).Return(model.Order{}, model.ErrOrderNotFound)
 
 	res, err := s.api.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: orderUUID})
 
@@ -83,12 +82,12 @@ func (s *APISuite) TestGetOrderByUuidNotFound() {
 
 func (s *APISuite) TestGetOrderByUuidServiceError() {
 	var (
-		ctx        = context.Background()
+		ctx        = s.authCtx()
 		orderUUID  = uuid.New()
 		serviceErr = errors.New("database is unavailable")
 	)
 
-	s.orderService.EXPECT().Get(ctx, orderUUID).Return(model.Order{}, serviceErr)
+	s.orderService.EXPECT().Get(ctx, orderUUID, s.userUUID).Return(model.Order{}, serviceErr)
 
 	res, err := s.api.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: orderUUID})
 

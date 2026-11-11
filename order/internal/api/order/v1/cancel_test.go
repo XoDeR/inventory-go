@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -13,11 +12,11 @@ import (
 
 func (s *APISuite) TestCancelOrderSuccess() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 	)
 
-	s.orderService.EXPECT().Cancel(ctx, orderUUID).Return(nil)
+	s.orderService.EXPECT().Cancel(ctx, orderUUID, s.userUUID).Return(nil)
 
 	res, err := s.api.CancelOrder(ctx, orderV1.CancelOrderParams{OrderUUID: orderUUID})
 
@@ -27,11 +26,11 @@ func (s *APISuite) TestCancelOrderSuccess() {
 
 func (s *APISuite) TestCancelOrderNotFound() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 	)
 
-	s.orderService.EXPECT().Cancel(ctx, orderUUID).Return(model.ErrOrderNotFound)
+	s.orderService.EXPECT().Cancel(ctx, orderUUID, s.userUUID).Return(model.ErrOrderNotFound)
 
 	res, err := s.api.CancelOrder(ctx, orderV1.CancelOrderParams{OrderUUID: orderUUID})
 
@@ -44,11 +43,11 @@ func (s *APISuite) TestCancelOrderNotFound() {
 
 func (s *APISuite) TestCancelOrderAlreadyPaid() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 	)
 
-	s.orderService.EXPECT().Cancel(ctx, orderUUID).Return(model.ErrOrderPaid)
+	s.orderService.EXPECT().Cancel(ctx, orderUUID, s.userUUID).Return(model.ErrOrderPaid)
 
 	res, err := s.api.CancelOrder(ctx, orderV1.CancelOrderParams{OrderUUID: orderUUID})
 
@@ -61,12 +60,12 @@ func (s *APISuite) TestCancelOrderAlreadyPaid() {
 
 func (s *APISuite) TestCancelOrderServiceError() {
 	var (
-		ctx        = context.Background()
+		ctx        = s.authCtx()
 		orderUUID  = uuid.New()
 		serviceErr = errors.New("database is unavailable")
 	)
 
-	s.orderService.EXPECT().Cancel(ctx, orderUUID).Return(serviceErr)
+	s.orderService.EXPECT().Cancel(ctx, orderUUID, s.userUUID).Return(serviceErr)
 
 	res, err := s.api.CancelOrder(ctx, orderV1.CancelOrderParams{OrderUUID: orderUUID})
 

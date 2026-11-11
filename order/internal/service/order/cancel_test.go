@@ -16,7 +16,7 @@ func (s *ServiceSuite) TestCancelSuccess() {
 
 		storedOrder = model.Order{
 			Uuid:       orderUUID,
-			UserUuid:   uuid.New(),
+			UserUuid:   testUserUUID,
 			TotalPrice: 100,
 			Status:     model.OrderStatusPendingPayment,
 		}
@@ -29,7 +29,7 @@ func (s *ServiceSuite) TestCancelSuccess() {
 	s.orderRepository.EXPECT().Update(ctx, cancelledOrder).Return(nil)
 	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(nil)
 
-	err := s.service.Cancel(ctx, orderUUID)
+	err := s.service.Cancel(ctx, orderUUID, testUserUUID)
 
 	s.Require().NoError(err)
 }
@@ -39,13 +39,13 @@ func (s *ServiceSuite) TestCancelAlreadyPaid() {
 		ctx       = context.Background()
 		orderUUID = uuid.New()
 
-		paidOrder = model.Order{Uuid: orderUUID, Status: model.OrderStatusPaid}
+		paidOrder = model.Order{Uuid: orderUUID, UserUuid: testUserUUID, Status: model.OrderStatusPaid}
 	)
 
 	// A paid order must not be updated: no Update expectation is set, so any call fails the test.
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(paidOrder, nil)
 
-	err := s.service.Cancel(ctx, orderUUID)
+	err := s.service.Cancel(ctx, orderUUID, testUserUUID)
 
 	s.Require().ErrorIs(err, model.ErrOrderPaid)
 }
@@ -58,7 +58,7 @@ func (s *ServiceSuite) TestCancelNotFound() {
 
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(model.Order{}, model.ErrOrderNotFound)
 
-	err := s.service.Cancel(ctx, orderUUID)
+	err := s.service.Cancel(ctx, orderUUID, testUserUUID)
 
 	s.Require().ErrorIs(err, model.ErrOrderNotFound)
 }
@@ -69,14 +69,14 @@ func (s *ServiceSuite) TestCancelUpdateError() {
 		orderUUID = uuid.New()
 		repoErr   = errors.New("database is unavailable")
 
-		storedOrder    = model.Order{Uuid: orderUUID, Status: model.OrderStatusPendingPayment}
-		cancelledOrder = model.Order{Uuid: orderUUID, Status: model.OrderStatusCancelled}
+		storedOrder    = model.Order{Uuid: orderUUID, UserUuid: testUserUUID, Status: model.OrderStatusPendingPayment}
+		cancelledOrder = model.Order{Uuid: orderUUID, UserUuid: testUserUUID, Status: model.OrderStatusCancelled}
 	)
 
 	s.orderRepository.EXPECT().Get(ctx, orderUUID.String()).Return(storedOrder, nil)
 	s.orderRepository.EXPECT().Update(ctx, cancelledOrder).Return(repoErr)
 
-	err := s.service.Cancel(ctx, orderUUID)
+	err := s.service.Cancel(ctx, orderUUID, testUserUUID)
 
 	s.Require().ErrorIs(err, repoErr)
 }
@@ -86,7 +86,7 @@ func (s *ServiceSuite) TestCancelCacheInvalidationFailureIsIgnored() {
 		ctx       = context.Background()
 		orderUUID = uuid.New()
 
-		storedOrder = model.Order{Uuid: orderUUID, Status: model.OrderStatusPendingPayment}
+		storedOrder = model.Order{Uuid: orderUUID, UserUuid: testUserUUID, Status: model.OrderStatusPendingPayment}
 
 		cancelledOrder = storedOrder
 	)
@@ -96,5 +96,5 @@ func (s *ServiceSuite) TestCancelCacheInvalidationFailureIsIgnored() {
 	s.orderRepository.EXPECT().Update(ctx, cancelledOrder).Return(nil)
 	s.orderCacheRepository.EXPECT().Delete(ctx, orderUUID.String()).Return(errors.New("redis is down"))
 
-	s.Require().NoError(s.service.Cancel(ctx, orderUUID))
+	s.Require().NoError(s.service.Cancel(ctx, orderUUID, testUserUUID))
 }

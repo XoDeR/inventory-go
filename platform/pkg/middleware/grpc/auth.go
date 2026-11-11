@@ -5,6 +5,7 @@ package grpc
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -38,14 +39,43 @@ type User struct {
 // AuthClient is an alias for the generated gRPC client of AuthService
 type AuthClient = authV1.AuthServiceClient
 
-// AuthInterceptor is an interceptor for authenticating gRPC requests
-type AuthInterceptor struct {
-	authClient AuthClient
+// infraServices are never authenticated: orchestrators probe health, and tools use reflection.
+var infraServices = []string{
+	"/grpc.health.v1.Health/",
+	"/grpc.reflection.v1.ServerReflection/",
+	"/grpc.reflection.v1alpha.ServerReflection/",
 }
 
-// NewAuthInterceptor creates a new authentication interceptor
-func NewAuthInterceptor(authClient AuthClient) *AuthInterceptor {
-	return &AuthInterceptor{authClient: authClient}
+// AuthInterceptor is an interceptor for authenticating gRPC requests
+type AuthInterceptor struct {
+	authClient    AuthClient
+	publicMethods map[string]struct{}
+}
+
+// NewAuthInterceptor creates a new authentication interceptor.
+// publicMethods are full method names (for example "/auth.v1.AuthService/Login") that skip
+// authentication. Health checks and reflection are always public.
+func NewAuthInterceptor(authClient AuthClient, publicMethods ...string) *AuthInterceptor {
+	public := make(map[string]struct{}, len(publicMethods))
+	for _, m := range publicMethods {
+		public[m] = struct{}{}
+	}
+
+	return &AuthInterceptor{authClient: authClient, publicMethods: public}
+}
+
+func (i *AuthInterceptor) isPublic(fullMethod string) bool {
+	if _, ok := i.publicMethods[fullMethod]; ok {
+		return true
+	}
+
+	for _, prefix := range infraServices {
+		if strings.HasPrefix(fullMethod, prefix) {
+			return true
+		}
+	}
+
+	return false
 }
 
 // Unary returns a unary server interceptor for authentication
@@ -53,9 +83,13 @@ func (i *AuthInterceptor) Unary() grpc.UnaryServerInterceptor {
 	return func(
 		ctx context.Context,
 		req any,
-		_ *grpc.UnaryServerInfo,
+		info *grpc.UnaryServerInfo,
 		handler grpc.UnaryHandler,
 	) (any, error) {
+		if i.isPublic(info.FullMethod) {
+			return handler(ctx, req)
+		}
+
 		authCtx, err := i.authenticate(ctx)
 		if err != nil {
 			return nil, err
@@ -124,4 +158,17 @@ func ForwardSessionUUIDToGRPC(ctx context.Context) context.Context {
 	}
 
 	return metadata.AppendToOutgoingContext(ctx, SessionUUIDMetadataKey, sessionUUID)
+}
+
+// GatewayHeaderMatcher lets the grpc-gateway forward the HTTP session header to gRPC as the
+// session-uuid metadata. Use it with runtime.WithIncomingHeaderMatcher; other headers keep
+// the gateway's default handling.
+func GatewayHeaderMatcher(sessionHeader string) func(string) (string, bool) {
+	return func(key string) (string, bool) {
+		if strings.EqualFold(key, sessionHeader) {
+			return SessionUUIDMetadataKey, true
+		}
+
+		return "", false
+	}
 }

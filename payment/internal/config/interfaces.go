@@ -12,3 +12,7 @@ type PaymentGRPCConfig interface {
 type PaymentHTTPConfig interface {
 	Address() string
 }
+
+type AuthClientConfig interface {
+	Address() string
+}

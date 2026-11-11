@@ -75,6 +75,12 @@ func NewContainer(ctx context.Context, opts ...Option) (*Container, error) {
 		WaitingFor:         cfg.StartupWait,
 		ExposedPorts:       []string{cfg.Port + "/tcp"},
 		HostConfigModifier: DefaultHostConfig(),
+		// Logs are followed from the very start of the container. Streaming them only after the
+		// startup wait succeeded would lose the output of a service that crashes on boot, which is
+		// exactly when it is needed.
+		LogConsumerCfg: &testcontainers.LogConsumerConfig{
+			Consumers: []testcontainers.LogConsumer{newLogConsumer(cfg.LogOutput)},
+		},
 	}
 
 	genericContainer, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
@@ -95,8 +101,6 @@ func NewContainer(ctx context.Context, opts ...Option) (*Container, error) {
 		return nil, fmt.Errorf("failed to get the container host: %w", err)
 	}
 
-	go streamContainerLogs(ctx, genericContainer, cfg.LogOutput, cfg.Logger)
-
 	cfg.Logger.Info(ctx, "App container started", "name", cfg.Name, "uri", net.JoinHostPort(host, mappedPort.Port()))
 
 	return &Container{
@@ -114,27 +118,6 @@ func (a *Container) Address() string {
 
 func (a *Container) Terminate(ctx context.Context) error {
 	return a.container.Terminate(ctx)
-}
-
-func streamContainerLogs(ctx context.Context, container testcontainers.Container, out io.Writer, log Logger) {
-	logs, err := container.Logs(ctx)
-	if err != nil {
-		log.Error(ctx, "failed to get container logs", "error", err)
-		return
-	}
-
-	go func() {
-		defer func() {
-			if cerr := logs.Close(); cerr != nil {
-				log.Error(ctx, "failed to close container logs", "error", cerr)
-			}
-		}()
-
-		_, cerr := io.Copy(out, logs)
-		if cerr != nil && cerr != io.EOF {
-			log.Error(ctx, "error copying container logs", "error", cerr)
-		}
-	}()
 }
 
 func DefaultHostConfig() func(hc *container.HostConfig) {

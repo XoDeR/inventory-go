@@ -11,7 +11,12 @@ import (
 
 // POST /api/v1/orders/{order_uuid}/cancel
 func (a *api) CancelOrder(ctx context.Context, params orderV1.CancelOrderParams) (orderV1.CancelOrderRes, error) {
-	err := a.orderService.Cancel(ctx, params.OrderUUID)
+	userUUID, err := currentUserUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	err = a.orderService.Cancel(ctx, params.OrderUUID, userUUID)
 	if err != nil {
 		switch {
 		case errors.Is(err, model.ErrOrderNotFound):

@@ -10,10 +10,12 @@ import (
 
 type OrderService interface {
 	Create(ctx context.Context, info model.CreateOrderInfo) (model.Order, error)
-	Get(ctx context.Context, uuid uuid.UUID) (model.Order, error)
+	// Get, Pay and Cancel work only on the orders of userUUID: for any other user the order
+	// is reported as model.ErrOrderNotFound, so the existence of foreign orders is not leaked.
+	Get(ctx context.Context, orderUUID, userUUID uuid.UUID) (model.Order, error)
 	// Pay pays the order and returns the transaction UUID.
-	Pay(ctx context.Context, uuid uuid.UUID, method model.PaymentMethod) (uuid.UUID, error)
-	Cancel(ctx context.Context, uuid uuid.UUID) error
+	Pay(ctx context.Context, orderUUID, userUUID uuid.UUID, method model.PaymentMethod) (uuid.UUID, error)
+	Cancel(ctx context.Context, orderUUID, userUUID uuid.UUID) error
 }
 
 // OrderProducerService publishes order events to Kafka.

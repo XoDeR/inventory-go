@@ -5,11 +5,12 @@ import (
 
 	clientConverter "inventory-go/order/internal/client/converter"
 	"inventory-go/order/internal/model"
+	grpcAuth "inventory-go/platform/pkg/middleware/grpc"
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
 )
 
 func (c *client) ListParts(ctx context.Context, filter model.PartsFilter) ([]model.Part, error) {
-	resp, err := c.generatedClient.ListParts(ctx, &inventoryV1.ListPartsRequest{
+	resp, err := c.generatedClient.ListParts(grpcAuth.ForwardSessionUUIDToGRPC(ctx), &inventoryV1.ListPartsRequest{
 		Filter: clientConverter.PartsFilterToProto(filter),
 	})
 	if err != nil {

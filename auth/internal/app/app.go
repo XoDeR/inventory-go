@@ -16,6 +16,7 @@ import (
 	"inventory-go/platform/pkg/closer"
 	"inventory-go/platform/pkg/grpc/health"
 	"inventory-go/platform/pkg/logger"
+	grpcAuth "inventory-go/platform/pkg/middleware/grpc"
 	"inventory-go/shared/pkg/interceptor"
 	authV1 "inventory-go/shared/pkg/proto/auth/v1"
 )
@@ -127,7 +128,22 @@ func (a *App) initListener(_ context.Context) error {
 }
 
 func (a *App) initGRPCServer(ctx context.Context) error {
-	a.grpcServer = grpc.NewServer(grpc.UnaryInterceptor(interceptor.UnaryValidate()))
+	// Register and Login are how a user gets a session, and Whoami takes the session in the request
+	// itself (it is also what other services call to validate sessions), so these three are public.
+	// Everything else, GetUser included, needs a valid session-uuid in the metadata.
+	authServer := a.diContainer.AuthV1API(ctx)
+
+	authInterceptor := grpcAuth.NewAuthInterceptor(
+		localAuthClient{server: authServer},
+		authV1.AuthService_Register_FullMethodName,
+		authV1.AuthService_Login_FullMethodName,
+		authV1.AuthService_Whoami_FullMethodName,
+	)
+
+	a.grpcServer = grpc.NewServer(grpc.ChainUnaryInterceptor(
+		authInterceptor.Unary(),
+		interceptor.UnaryValidate(),
+	))
 
 	closer.AddNamed("gRPC server", func(_ context.Context) error {
 		a.grpcServer.GracefulStop()
@@ -139,7 +155,7 @@ func (a *App) initGRPCServer(ctx context.Context) error {
 	// the health service lets orchestrators probe the server
 	health.RegisterService(a.grpcServer)
 
-	authV1.RegisterAuthServiceServer(a.grpcServer, a.diContainer.AuthV1API(ctx))
+	authV1.RegisterAuthServiceServer(a.grpcServer, authServer)
 
 	return nil
 }

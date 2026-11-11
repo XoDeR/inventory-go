@@ -2,6 +2,8 @@ package model
 
 import "errors"
 
+var ErrUnauthenticated = errors.New("authentication required")
+
 var (
 	ErrOrderNotFound  = errors.New("order not found")
 	ErrOrderPaid      = errors.New("order is already paid and cannot be cancelled")

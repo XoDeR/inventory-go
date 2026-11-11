@@ -12,6 +12,7 @@ import (
 
 	"inventory-go/platform/pkg/logger"
 	"inventory-go/platform/pkg/testcontainers/app"
+	"inventory-go/platform/pkg/testcontainers/authstack"
 	"inventory-go/platform/pkg/testcontainers/network"
 	"inventory-go/platform/pkg/testcontainers/path"
 )
@@ -37,6 +38,7 @@ const (
 // TestEnvironment holds the resources of the test environment.
 type TestEnvironment struct {
 	Network *network.Network
+	Auth    *authstack.Stack
 	App     *app.Container
 }
 
@@ -50,7 +52,17 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 	}
 	logger.Info(ctx, "Network created")
 
+	auth, err := authstack.Start(ctx, generatedNetwork.Name(), projectName)
+	if err != nil {
+		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork})
+		return nil, fmt.Errorf("failed to start the auth service: %w", err)
+	}
+	logger.Info(ctx, "Auth service started")
+
 	appEnv := map[string]string{
+		"AUTH_GRPC_HOST": auth.Host,
+		"AUTH_GRPC_PORT": authstack.GRPCPort,
+
 		"GRPC_HOST": "0.0.0.0",
 		"GRPC_PORT": grpcPort,
 		"HTTP_HOST": "0.0.0.0",
@@ -75,12 +87,12 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		app.WithLogger(logger.Default()),
 	)
 	if err != nil {
-		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork})
+		cleanupTestEnvironment(ctx, &TestEnvironment{Network: generatedNetwork, Auth: auth})
 		return nil, fmt.Errorf("failed to start the app container: %w", err)
 	}
 	logger.Info(ctx, "App container started")
 
-	return &TestEnvironment{Network: generatedNetwork, App: appContainer}, nil
+	return &TestEnvironment{Network: generatedNetwork, Auth: auth, App: appContainer}, nil
 }
 
 // teardownTestEnvironment releases all resources of the test environment.
@@ -100,6 +112,10 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 		} else {
 			logger.Info(ctx, "App container stopped")
 		}
+	}
+
+	if env.Auth != nil {
+		env.Auth.Terminate(ctx)
 	}
 
 	if env.Network != nil {

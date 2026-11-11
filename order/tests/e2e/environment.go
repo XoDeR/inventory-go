@@ -12,6 +12,7 @@ import (
 
 	"inventory-go/platform/pkg/logger"
 	"inventory-go/platform/pkg/testcontainers/app"
+	"inventory-go/platform/pkg/testcontainers/authstack"
 	"inventory-go/platform/pkg/testcontainers/kafka"
 	"inventory-go/platform/pkg/testcontainers/mongo"
 	"inventory-go/platform/pkg/testcontainers/network"
@@ -86,6 +87,7 @@ const (
 // TestEnvironment holds the resources of the test environment.
 type TestEnvironment struct {
 	Network   *network.Network
+	Auth      *authstack.Stack
 	Postgres  *postgres.Container
 	Kafka     *kafka.Container
 	Mongo     *mongo.Container
@@ -161,6 +163,11 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		return fail("failed to start the Redis container", err)
 	}
 
+	env.Auth, err = authstack.Start(ctx, env.Network.Name(), projectName)
+	if err != nil {
+		return fail("failed to start the auth service", err)
+	}
+
 	env.Inventory, err = startService(ctx, env.Network.Name(), "inventory", "grpc_server", inventoryAppName, inventoryGRPC, map[string]string{
 		"GRPC_HOST": "0.0.0.0",
 		"GRPC_PORT": inventoryGRPC,
@@ -180,6 +187,9 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"REDIS_MAX_IDLE":           redisMaxIdle,
 		"REDIS_IDLE_TIMEOUT":       redisIdleTimeout,
 		"REDIS_CACHE_TTL":          redisCacheTTL,
+
+		"AUTH_GRPC_HOST": env.Auth.Host,
+		"AUTH_GRPC_PORT": authstack.GRPCPort,
 	})
 	if err != nil {
 		return fail("failed to start the inventory service", err)
@@ -190,6 +200,9 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"GRPC_PORT": paymentGRPC,
 		"HTTP_HOST": "0.0.0.0",
 		"HTTP_PORT": paymentHTTP,
+
+		"AUTH_GRPC_HOST": env.Auth.Host,
+		"AUTH_GRPC_PORT": authstack.GRPCPort,
 	})
 	if err != nil {
 		return fail("failed to start the payment service", err)
@@ -230,6 +243,9 @@ func setupTestEnvironment(ctx context.Context) (*TestEnvironment, error) {
 		"INVENTORY_GRPC_PORT": inventoryGRPC,
 		"PAYMENT_GRPC_HOST":   paymentAppName,
 		"PAYMENT_GRPC_PORT":   paymentGRPC,
+
+		"AUTH_GRPC_HOST": env.Auth.Host,
+		"AUTH_GRPC_PORT": authstack.GRPCPort,
 
 		"POSTGRES_HOST":     postgresName,
 		"POSTGRES_PORT":     postgresPort,
@@ -303,6 +319,10 @@ func cleanupTestEnvironment(ctx context.Context, env *TestEnvironment) {
 		} else {
 			logger.Info(ctx, "Service container stopped", "service", name)
 		}
+	}
+
+	if env.Auth != nil {
+		env.Auth.Terminate(ctx)
 	}
 
 	if env.Kafka != nil {

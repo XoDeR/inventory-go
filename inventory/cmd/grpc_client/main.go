@@ -4,11 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"os"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
@@ -38,6 +40,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), requestTimeout)
 	defer cancel()
+
+	// the service needs a session: log in via the auth service and pass SESSION_UUID=<session_uuid>
+	if sessionUUID := os.Getenv("SESSION_UUID"); sessionUUID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "session-uuid", sessionUUID)
+	}
 
 	parts, err := listParts(ctx, client, nil)
 	if err != nil {

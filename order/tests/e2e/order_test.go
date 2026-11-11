@@ -30,8 +30,11 @@ var _ = Describe("OrderService", func() {
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(suiteCtx)
 
-		var err error
-		client, err = orderV1.NewClient("http://" + env.Order.Address())
+		// every order call needs a session: the client sends the header of a freshly registered user
+		user, err := env.Auth.NewUser(suiteCtx)
+		Expect(err).ToNot(HaveOccurred(), "expected to register a user")
+
+		client, err = orderV1.NewClient("http://"+env.Order.Address(), orderV1.WithClient(sessionClient(user.SessionUUID)))
 		Expect(err).ToNot(HaveOccurred(), "expected to create the order API client")
 	})
 
@@ -195,5 +198,102 @@ var _ = Describe("OrderService", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(res).To(BeAssignableToTypeOf(&orderV1.CancelOrderNotFound{}))
 		})
+	})
+})
+
+// sessionTransport adds the session header to every request.
+type sessionTransport struct {
+	sessionUUID string
+}
+
+func (t sessionTransport) RoundTrip(r *http.Request) (*http.Response, error) {
+	r = r.Clone(r.Context())
+	if t.sessionUUID != "" {
+		r.Header.Set("X-Session-Uuid", t.sessionUUID)
+	}
+
+	return http.DefaultTransport.RoundTrip(r)
+}
+
+// sessionClient returns an HTTP client that sends the given session UUID with every request.
+func sessionClient(sessionUUID string) *http.Client {
+	return &http.Client{Transport: sessionTransport{sessionUUID: sessionUUID}}
+}
+
+var _ = Describe("OrderService authentication", func() {
+	It("rejects a request without a session", func() {
+		resp, err := http.Get("http://" + env.Order.Address() + "/api/v1/orders/" + uuid.NewString())
+
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = resp.Body.Close() }()
+
+		Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+	})
+
+	It("rejects a request with an unknown session", func() {
+		req, err := http.NewRequest(http.MethodGet, "http://"+env.Order.Address()+"/api/v1/orders/"+uuid.NewString(), nil)
+		Expect(err).ToNot(HaveOccurred())
+
+		resp, err := sessionClient(uuid.NewString()).Do(req)
+
+		Expect(err).ToNot(HaveOccurred())
+		defer func() { _ = resp.Body.Close() }()
+
+		Expect(resp.StatusCode).To(Equal(http.StatusUnauthorized))
+	})
+})
+
+var _ = Describe("OrderService ownership", func() {
+	It("hides an order from other users and does not let them pay or cancel it", func() {
+		ctx := suiteCtx
+
+		owner, err := env.Auth.NewUser(ctx)
+		Expect(err).ToNot(HaveOccurred())
+		other, err := env.Auth.NewUser(ctx)
+		Expect(err).ToNot(HaveOccurred())
+
+		ownerClient, err := orderV1.NewClient("http://"+env.Order.Address(), orderV1.WithClient(sessionClient(owner.SessionUUID)))
+		Expect(err).ToNot(HaveOccurred())
+		otherClient, err := orderV1.NewClient("http://"+env.Order.Address(), orderV1.WithClient(sessionClient(other.SessionUUID)))
+		Expect(err).ToNot(HaveOccurred())
+
+		// the owner creates an order; the user_uuid of the body is ignored in favour of the session
+		res, err := ownerClient.CreateOrder(ctx, &orderV1.CreateOrderRequest{
+			UserUUID:  uuid.New(),
+			PartUuids: []uuid.UUID{seededCPU},
+		})
+		Expect(err).ToNot(HaveOccurred())
+
+		created, ok := res.(*orderV1.CreateOrderResponse)
+		Expect(ok).To(BeTrue(), "expected a successful CreateOrder response, got %T", res)
+
+		// the owner sees it and it belongs to the owner's session user
+		got, err := ownerClient.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: created.UUID})
+		Expect(err).ToNot(HaveOccurred())
+
+		order, ok := got.(*orderV1.Order)
+		Expect(ok).To(BeTrue(), "expected the owner to get the order, got %T", got)
+		Expect(order.UserUUID.String()).To(Equal(owner.UUID))
+
+		// another user gets NotFound for every operation
+		foreignGet, err := otherClient.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: created.UUID})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(foreignGet).To(BeAssignableToTypeOf(&orderV1.GetOrderByUuidNotFound{}))
+
+		foreignPay, err := otherClient.PayOrder(ctx,
+			&orderV1.PayOrderRequest{PaymentMethod: orderV1.PaymentMethodCARD},
+			orderV1.PayOrderParams{OrderUUID: created.UUID},
+		)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(foreignPay).To(BeAssignableToTypeOf(&orderV1.PayOrderNotFound{}))
+
+		foreignCancel, err := otherClient.CancelOrder(ctx, orderV1.CancelOrderParams{OrderUUID: created.UUID})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(foreignCancel).To(BeAssignableToTypeOf(&orderV1.CancelOrderNotFound{}))
+
+		// and the order is untouched
+		after, err := ownerClient.GetOrderByUuid(ctx, orderV1.GetOrderByUuidParams{OrderUUID: created.UUID})
+		Expect(err).ToNot(HaveOccurred())
+		Expect(after.(*orderV1.Order).Status).To(Equal(orderV1.OrderStatusPENDINGPAYMENT))
 	})
 })

@@ -12,7 +12,12 @@ import (
 
 // GET /api/v1/orders/{order_uuid}
 func (a *api) GetOrderByUuid(ctx context.Context, params orderV1.GetOrderByUuidParams) (orderV1.GetOrderByUuidRes, error) {
-	order, err := a.orderService.Get(ctx, params.OrderUUID)
+	userUUID, err := currentUserUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	order, err := a.orderService.Get(ctx, params.OrderUUID, userUUID)
 	if err != nil {
 		if errors.Is(err, model.ErrOrderNotFound) {
 			return &orderV1.GetOrderByUuidNotFound{

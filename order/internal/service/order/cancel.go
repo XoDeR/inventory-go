@@ -8,9 +8,13 @@ import (
 	"inventory-go/order/internal/model"
 )
 
-func (s *service) Cancel(ctx context.Context, uuid uuid.UUID) error {
-	order, err := s.orderRepository.Get(ctx, uuid.String())
+func (s *service) Cancel(ctx context.Context, orderUUID, userUUID uuid.UUID) error {
+	order, err := s.orderRepository.Get(ctx, orderUUID.String())
 	if err != nil {
+		return err
+	}
+
+	if order, err = ownedBy(order, userUUID); err != nil {
 		return err
 	}
 
@@ -24,7 +28,7 @@ func (s *service) Cancel(ctx context.Context, uuid uuid.UUID) error {
 		return err
 	}
 
-	s.invalidateCache(ctx, uuid.String())
+	s.invalidateCache(ctx, orderUUID.String())
 
 	return nil
 }

@@ -12,7 +12,12 @@ import (
 
 // POST /api/v1/orders/{order_uuid}/pay
 func (a *api) PayOrder(ctx context.Context, req *orderV1.PayOrderRequest, params orderV1.PayOrderParams) (orderV1.PayOrderRes, error) {
-	transactionUUID, err := a.orderService.Pay(ctx, params.OrderUUID, converter.PaymentMethodToModel(req.PaymentMethod))
+	userUUID, err := currentUserUUID(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	transactionUUID, err := a.orderService.Pay(ctx, params.OrderUUID, userUUID, converter.PaymentMethodToModel(req.PaymentMethod))
 	if err != nil {
 		if errors.Is(err, model.ErrOrderNotFound) {
 			return &orderV1.PayOrderNotFound{

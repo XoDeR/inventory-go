@@ -1,7 +1,6 @@
 package v1
 
 import (
-	"context"
 	"errors"
 	"net/http"
 
@@ -13,7 +12,7 @@ import (
 
 func (s *APISuite) TestPayOrderSuccess() {
 	var (
-		ctx           = context.Background()
+		ctx           = s.authCtx()
 		orderUUID     = uuid.New()
 		transactionID = uuid.New()
 
@@ -22,7 +21,7 @@ func (s *APISuite) TestPayOrderSuccess() {
 	)
 
 	// The OpenAPI payment method must be converted to the model one before it reaches the service.
-	s.orderService.EXPECT().Pay(ctx, orderUUID, model.PaymentMethodCreditCard).Return(transactionID, nil)
+	s.orderService.EXPECT().Pay(ctx, orderUUID, s.userUUID, model.PaymentMethodCreditCard).Return(transactionID, nil)
 
 	res, err := s.api.PayOrder(ctx, req, params)
 
@@ -32,14 +31,14 @@ func (s *APISuite) TestPayOrderSuccess() {
 
 func (s *APISuite) TestPayOrderNotFound() {
 	var (
-		ctx       = context.Background()
+		ctx       = s.authCtx()
 		orderUUID = uuid.New()
 
 		req    = &orderV1.PayOrderRequest{PaymentMethod: orderV1.PaymentMethodCARD}
 		params = orderV1.PayOrderParams{OrderUUID: orderUUID}
 	)
 
-	s.orderService.EXPECT().Pay(ctx, orderUUID, model.PaymentMethodCard).Return(uuid.Nil, model.ErrOrderNotFound)
+	s.orderService.EXPECT().Pay(ctx, orderUUID, s.userUUID, model.PaymentMethodCard).Return(uuid.Nil, model.ErrOrderNotFound)
 
 	res, err := s.api.PayOrder(ctx, req, params)
 
@@ -52,7 +51,7 @@ func (s *APISuite) TestPayOrderNotFound() {
 
 func (s *APISuite) TestPayOrderServiceError() {
 	var (
-		ctx        = context.Background()
+		ctx        = s.authCtx()
 		orderUUID  = uuid.New()
 		serviceErr = errors.New("payment is unavailable")
 
@@ -60,7 +59,7 @@ func (s *APISuite) TestPayOrderServiceError() {
 		params = orderV1.PayOrderParams{OrderUUID: orderUUID}
 	)
 
-	s.orderService.EXPECT().Pay(ctx, orderUUID, model.PaymentMethodCard).Return(uuid.Nil, serviceErr)
+	s.orderService.EXPECT().Pay(ctx, orderUUID, s.userUUID, model.PaymentMethodCard).Return(uuid.Nil, serviceErr)
 
 	res, err := s.api.PayOrder(ctx, req, params)
 

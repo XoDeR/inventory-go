@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
 	inventoryV1 "inventory-go/shared/pkg/proto/inventory/v1"
@@ -29,7 +30,12 @@ var _ = Describe("InventoryService", func() {
 	BeforeEach(func() {
 		ctx, cancel = context.WithCancel(suiteCtx)
 
-		var err error
+		// every inventory call needs a session, so all calls made with ctx are authenticated
+		user, err := env.Auth.NewUser(suiteCtx)
+		Expect(err).ToNot(HaveOccurred(), "expected to register a user")
+
+		ctx = metadata.AppendToOutgoingContext(ctx, "session-uuid", user.SessionUUID)
+
 		conn, err = grpc.NewClient(
 			env.App.Address(),
 			grpc.WithTransportCredentials(insecure.NewCredentials()),
@@ -45,6 +51,12 @@ var _ = Describe("InventoryService", func() {
 	})
 
 	Describe("GetPart", func() {
+		It("rejects a call without a session", func() {
+			_, err := inventoryClient.GetPart(suiteCtx, &inventoryV1.GetPartRequest{Uuid: seededCPUUUID})
+
+			Expect(status.Code(err)).To(Equal(codes.Unauthenticated))
+		})
+
 		It("returns a seeded part by UUID", func() {
 			resp, err := inventoryClient.GetPart(ctx, &inventoryV1.GetPartRequest{Uuid: seededCPUUUID})
 

@@ -16,6 +16,7 @@ import (
 	"inventory-go/order/migrations"
 	"inventory-go/platform/pkg/closer"
 	"inventory-go/platform/pkg/logger"
+	httpAuth "inventory-go/platform/pkg/middleware/http"
 	orderV1 "inventory-go/shared/pkg/openapi/order/v1"
 )
 
@@ -120,6 +121,8 @@ func (a *App) initHTTPServer(ctx context.Context) error {
 	r.Use(middleware.Logger) // log like: PUT http://localhost:8080/api/v1/order/3c516345-47df-4eba-a9d6-da1e3d80860b HTTP/1.1" from 127.0.0.
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(requestTimeout))
+	// every order route needs a valid session: X-Session-Uuid is checked against the auth service
+	r.Use(httpAuth.NewAuthMiddleware(a.diContainer.AuthClient(ctx)).Handle)
 
 	r.Mount("/", orderServer)
 

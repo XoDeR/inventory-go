@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"log/slog"
+	"os"
 	"time"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	paymentV1 "inventory-go/shared/pkg/proto/payment/v1"
 )
@@ -33,6 +35,11 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
+
+	// the service needs a session: log in via the auth service and pass SESSION_UUID=<session_uuid>
+	if sessionUUID := os.Getenv("SESSION_UUID"); sessionUUID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, "session-uuid", sessionUUID)
+	}
 
 	resp, err := client.PayOrder(ctx, &paymentV1.PayOrderRequest{
 		OrderUuid:     uuid.NewString(),

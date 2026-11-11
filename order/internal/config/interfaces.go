@@ -49,3 +49,7 @@ type RedisConfig interface {
 	IdleTimeout() time.Duration
 	CacheTTL() time.Duration
 }
+
+type AuthClientConfig interface {
+	Address() string
+}
